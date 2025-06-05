@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,7 +87,7 @@ Token lex_number(Lexer *self)
 {
     assert(isdigit(self->text[self->cur]));
 
-    long num = 0;
+    int64_t num = 0;
     while (self->cur < self->text_len && isdigit(self->text[self->cur])) {
         num *= 10;
         num += char_to_digit(self->text[self->cur]);
@@ -173,7 +174,7 @@ void token_print(FILE *f, Token tok)
     } break;
 
     case TOK_TYPE_INT: {
-        fprintf(f, "INT(%ld)", tok.intval);
+        fprintf(f, "INT(%" PRIi64 ")", tok.intval);
     } break;
     }
 }

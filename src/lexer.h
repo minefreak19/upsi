@@ -23,7 +23,7 @@ typedef struct {
     TokenType type;
     union {
         StringView name;
-        long intval;
+        int64_t intval;
     };
 } Token;
 
