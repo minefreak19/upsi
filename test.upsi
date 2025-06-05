@@ -2,3 +2,5 @@
     dim length; 
 
 ;unit metre: length;  
+
+unit mile: length = 11293081 metre;

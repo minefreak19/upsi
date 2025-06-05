@@ -12,14 +12,19 @@ typedef enum {
     TOK_TYPE_KEYWORD_UNIT,
 
     TOK_TYPE_NAME,
+    TOK_TYPE_INT,
 
     TOK_TYPE_SEMICOLON,
     TOK_TYPE_COLON,
+    TOK_TYPE_EQ,
 } TokenType;
 
 typedef struct {
     TokenType type;
-    StringView name;
+    union {
+        StringView name;
+        long intval;
+    };
 } Token;
 
 typedef struct {
