@@ -95,10 +95,38 @@ Token lex_number(Lexer *self)
         self->cur++;
     }
 
-    return (Token) {
-        .type   = TOK_TYPE_INT,
-        .intval = num,
-    };
+    if (self->cur < self->text_len && self->text[self->cur] == '.') {
+        if (self->cur + 1 >= self->text_len ||
+            !isdigit(self->text[self->cur + 1])) {
+            // TODO: Add a proper error reporting mechanism
+            fprintf(
+                stderr,
+                "ERROR: Could not lex number - trailing `.' without further "
+                "digits\n");
+            exit(1);
+        }
+
+        self->cur++;
+
+        double fracpart = 0;
+        double factor   = 0.1;
+        while (isdigit(self->text[self->cur])) {
+            fracpart += factor * char_to_digit(self->text[self->cur]);
+            factor /= 10.0;
+
+            self->cur++;
+        }
+
+        return (Token) {
+            .type     = TOK_TYPE_FLOAT,
+            .floatval = ((double) num + fracpart),
+        };
+    } else {
+        return (Token) {
+            .type   = TOK_TYPE_INT,
+            .intval = num,
+        };
+    }
 }
 
 // TODO: This currently assumes the input is a sequence of completely valid
@@ -117,7 +145,6 @@ Token lex_token(Lexer *self)
     if (try_lex_symb(self, &res)) return res;
     // TODO: Support negative numbers in lexer
     if (isdigit(self->text[self->cur])) {
-        // TODO: can this fail?
         return lex_number(self);
     }
 
@@ -175,6 +202,10 @@ void token_print(FILE *f, Token tok)
 
     case TOK_TYPE_INT: {
         fprintf(f, "INT(%" PRIi64 ")", tok.intval);
+    } break;
+
+    case TOK_TYPE_FLOAT: {
+        fprintf(f, "FLOAT(%f)", tok.floatval);
     } break;
     }
 }
