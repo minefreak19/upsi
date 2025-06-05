@@ -80,5 +80,7 @@ int main(int argc, char **argv)
         token_print(stdout, tok);
         putc('\n', stdout);
     }
+
+    free((void *) text);
     return 0;
 }
