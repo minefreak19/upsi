@@ -1,4 +1,5 @@
-CFLAGS:=-Wall -Wextra -Wpedantic -std=c99 -glldb
+# TODO: Can this be moved to C99?
+CFLAGS:=-Wall -Wextra -Wpedantic -std=c11 -glldb
 
 SOURCE_FILES:=$(wildcard src/*.c)
 HEADER_FILES:=$(wildcard src/*.h)
