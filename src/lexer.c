@@ -11,11 +11,34 @@
 
 #include "sv.h"
 
+static_assert(TOK_TYPE__COUNT == 11,
+              "Exhaustive definition of TOK_NAMES wrt TokenType's");
+static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
+    [TOK_TYPE_KEYWORD_DIM]  = SV("dim"),
+    [TOK_TYPE_KEYWORD_UNIT] = SV("unit"),
+
+    [TOK_TYPE_SEMICOLON] = SV(";"),
+    [TOK_TYPE_COLON]     = SV(":"),
+    [TOK_TYPE_EQ]        = SV("="),
+};
+
+bool tok_is_keyword(Token tok)
+{
+    return TOK_TYPE__KW_START <= tok.type && tok.type < TOK_TYPE__KW_END;
+}
+
+bool tok_is_symb(Token tok)
+{
+    return TOK_TYPE__SYMB_START <= tok.type && tok.type < TOK_TYPE__SYMB_END;
+}
+
 bool is_symb(char c)
 {
-    const char *symbols = ";:=";
-    for (; *symbols; symbols++) {
-        if (c == *symbols) return true;
+    // TODO: For any potential multi-character symbols, should this function
+    // return true for all characters or only the first character of each
+    // symbol?
+    for (int i = TOK_TYPE__SYMB_START; i < TOK_TYPE__SYMB_END; i++) {
+        if (c == TOK_NAMES[i].text[0]) return true;
     }
     return false;
 }
@@ -26,30 +49,18 @@ bool try_lex_symb(Lexer *self, Token *resp)
         return false;
     }
 
-    Token res = {0};
-    switch (self->text[self->cur]) {
-    case ';': {
-        res.type = TOK_TYPE_SEMICOLON;
-        self->cur++;
-        *resp = res;
-        return true;
+    for (int type = TOK_TYPE__SYMB_START; type < TOK_TYPE__SYMB_END; type++) {
+        StringView name = TOK_NAMES[type];
+
+        if (strncmp(&self->text[self->cur], name.text, name.len) == 0) {
+            resp->type = type;
+            self->cur += name.len;
+            return true;
+        }
     }
-    case ':': {
-        res.type = TOK_TYPE_COLON;
-        self->cur++;
-        *resp = res;
-        return true;
-    }
-    case '=': {
-        res.type = TOK_TYPE_EQ;
-        self->cur++;
-        *resp = res;
-        return true;
-    }
-    default: {
-        return false;
-    }
-    }
+    // No symbol matches
+
+    return false;
 }
 
 bool try_lex_word(Lexer *self, StringView *resp)
@@ -150,63 +161,57 @@ Token lex_token(Lexer *self)
 
     StringView word;
     if (try_lex_word(self, &word)) {
-        // TODO: Automate this somehow (with a table of keywords)
-        // This might require adding a union to Token
-        if (sv_eq(word, SV("dim"))) {
-            res.type = TOK_TYPE_KEYWORD_DIM;
-            return res;
-        } else if (sv_eq(word, SV("unit"))) {
-            res.type = TOK_TYPE_KEYWORD_UNIT;
-            return res;
-        } else {
-            res.type = TOK_TYPE_NAME;
-            res.name = word;
-            return res;
+        for (int kw = TOK_TYPE__KW_START; kw < TOK_TYPE__KW_END; kw++) {
+            if (sv_eq(word, TOK_NAMES[kw])) {
+                res.type = kw;
+                return res;
+            }
         }
+        // No keyword matches
+
+        res.type = TOK_TYPE_NAME;
+        res.name = word;
+        return res;
     }
 
     assert(0 && "could not lex text");
 }
 
-// TODO: Implement a more flexible way to show tokens
+static_assert(
+    TOK_TYPE__COUNT == 11,
+    "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {
-    switch (tok.type) {
-    case TOK_TYPE_NONE: {
-        fprintf(f, "NONE");
-    } break;
+    if (tok_is_keyword(tok)) {
+        fprintf(f, "KW(" SV_FMT ")", SV_ARG(TOK_NAMES[tok.type]));
+    } else if (tok_is_symb(tok)) {
+        fprintf(f, "SYMB(" SV_FMT ")", SV_ARG(TOK_NAMES[tok.type]));
+    } else {
+        switch (tok.type) {
+        case TOK_TYPE_NONE: {
+            fprintf(f, "NONE");
+        } break;
 
-    case TOK_TYPE_KEYWORD_DIM: {
-        fprintf(f, "KW(dim)");
-    } break;
+        case TOK_TYPE_NAME: {
+            fprintf(f, "NAME(" SV_FMT ")", SV_ARG(tok.name));
+        } break;
 
-    case TOK_TYPE_KEYWORD_UNIT: {
-        fprintf(f, "KW(unit)");
-    } break;
+        case TOK_TYPE_INT: {
+            fprintf(f, "INT(%" PRIi64 ")", tok.intval);
+        } break;
 
-    case TOK_TYPE_SEMICOLON: {
-        fprintf(f, "SEMICOLON");
-    } break;
+        case TOK_TYPE_FLOAT: {
+            fprintf(f, "FLOAT(%f)", tok.floatval);
+        } break;
 
-    case TOK_TYPE_COLON: {
-        fprintf(f, "COLON");
-    } break;
-
-    case TOK_TYPE_EQ: {
-        fprintf(f, "EQ");
-    } break;
-
-    case TOK_TYPE_NAME: {
-        fprintf(f, "NAME(" SV_FMT ")", SV_ARG(tok.name));
-    } break;
-
-    case TOK_TYPE_INT: {
-        fprintf(f, "INT(%" PRIi64 ")", tok.intval);
-    } break;
-
-    case TOK_TYPE_FLOAT: {
-        fprintf(f, "FLOAT(%f)", tok.floatval);
-    } break;
+        default: {
+            fprintf(stderr,
+                    "%s:%d (%s): ERROR: Unreachable - found token with illegal "
+                    "type %d\n",
+                    __FILE__, __LINE__, __func__, tok.type);
+            exit(1);
+        }
+        }
     }
 }
 

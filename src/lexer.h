@@ -8,17 +8,23 @@
 typedef enum {
     TOK_TYPE_NONE = 0,
 
-    TOK_TYPE_KEYWORD_DIM,
+    TOK_TYPE__KW_START,
+    TOK_TYPE_KEYWORD_DIM = TOK_TYPE__KW_START,
     TOK_TYPE_KEYWORD_UNIT,
+    TOK_TYPE__KW_END,
+
+    TOK_TYPE__SYMB_START,
+    TOK_TYPE_SEMICOLON = TOK_TYPE__SYMB_START,
+    TOK_TYPE_COLON,
+    TOK_TYPE_EQ,
+    TOK_TYPE__SYMB_END,
 
     TOK_TYPE_NAME,
     // TODO: Do we need INT and FLOAT to be separate?
     TOK_TYPE_INT,
     TOK_TYPE_FLOAT,
 
-    TOK_TYPE_SEMICOLON,
-    TOK_TYPE_COLON,
-    TOK_TYPE_EQ,
+    TOK_TYPE__COUNT,
 } TokenType;
 
 typedef struct {
