@@ -3,4 +3,5 @@
 
 ;unit metre: length;  
 
-unit mile: length = 1.6 metre;
+unit mile: length = 1.6 * 1000 metre;
+

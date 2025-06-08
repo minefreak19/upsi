@@ -11,7 +11,7 @@
 
 #include "sv.h"
 
-static_assert(TOK_TYPE__COUNT == 11,
+static_assert(TOK_TYPE__COUNT == 13,
               "Exhaustive definition of TOK_NAMES wrt TokenType's");
 static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_KEYWORD_DIM]  = SV("dim"),
@@ -20,6 +20,8 @@ static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_SEMICOLON] = SV(";"),
     [TOK_TYPE_COLON]     = SV(":"),
     [TOK_TYPE_EQ]        = SV("="),
+    [TOK_TYPE_STAR]      = SV("*"),
+    [TOK_TYPE_SLASH]     = SV("/"),
 };
 
 bool tok_is_keyword(Token tok)
@@ -178,7 +180,7 @@ Token lex_token(Lexer *self)
 }
 
 static_assert(
-    TOK_TYPE__COUNT == 11,
+    TOK_TYPE__COUNT == 13,
     "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {
