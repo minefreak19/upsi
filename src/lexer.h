@@ -19,6 +19,8 @@ typedef enum {
     TOK_TYPE_EQ,
     TOK_TYPE_STAR,
     TOK_TYPE_SLASH,
+    TOK_TYPE_LPAREN,
+    TOK_TYPE_RPAREN,
     TOK_TYPE__SYMB_END,
 
     TOK_TYPE_NAME,
