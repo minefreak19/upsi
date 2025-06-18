@@ -73,7 +73,8 @@ int main(int argc, char **argv)
 
     const char *text = slurp_file_to_cstr(args.source_file);
 
-    Lexer lexer = lexer_from_cstr(text);
+    Lexer lexer    = lexer_from_cstr(text);
+    lexer.loc.file = sv_from_cstr(args.source_file);
 
     for (Token tok = lex_token(&lexer); tok.type != TOK_TYPE_NONE;
          tok       = lex_token(&lexer)) {

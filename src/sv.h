@@ -16,12 +16,21 @@ typedef struct {
 // cast to int?
 #define SV_ARG(sv) ((int) (sv).len), ((sv).text)
 
+StringView sv_from_cstr(const char *cstr);
 bool sv_eq(StringView a, StringView b);
 
 #endif  // SV_H_
 
 #ifdef SV_IMPLEMENTATION
 #include <string.h>
+
+StringView sv_from_cstr(const char *cstr)
+{
+    return (StringView) {
+        .text = cstr,
+        .len  = strlen(cstr),
+    };
+}
 
 bool sv_eq(StringView a, StringView b)
 {

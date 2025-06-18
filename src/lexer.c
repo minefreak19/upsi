@@ -47,6 +47,26 @@ bool is_symb(char c)
     return false;
 }
 
+// TODO: Handle different types of line endings properly (LF/CRLF/CR)
+void lexer_advance(Lexer *self, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        if (self->text[self->cur] == '\n') {
+            self->loc.line++;
+            self->loc.col = 0;
+        }
+        self->loc.col++;
+        self->cur++;
+    }
+}
+
+void lexer_trim_left(Lexer *self)
+{
+    while (self->cur < self->text_len && isspace(self->text[self->cur])) {
+        lexer_advance(self, 1);
+    }
+}
+
 bool try_lex_symb(Lexer *self, Token *resp)
 {
     if (self->cur >= self->text_len) {
@@ -58,7 +78,7 @@ bool try_lex_symb(Lexer *self, Token *resp)
 
         if (strncmp(&self->text[self->cur], name.text, name.len) == 0) {
             resp->type = type;
-            self->cur += name.len;
+            lexer_advance(self, name.len);
             return true;
         }
     }
@@ -84,7 +104,7 @@ bool try_lex_word(Lexer *self, StringView *resp)
             *resp = res;
             return true;
         }
-        self->cur++;
+        lexer_advance(self, 1);
         res.len++;
     }
 
@@ -102,12 +122,15 @@ Token lex_number(Lexer *self)
 {
     assert(isdigit(self->text[self->cur]));
 
+    // Save loc at the beginning of the number
+    FileLoc loc = self->loc;
+
     int64_t num = 0;
     while (self->cur < self->text_len && isdigit(self->text[self->cur])) {
         num *= 10;
         num += char_to_digit(self->text[self->cur]);
 
-        self->cur++;
+        lexer_advance(self, 1);
     }
 
     if (self->cur < self->text_len && self->text[self->cur] == '.') {
@@ -121,7 +144,7 @@ Token lex_number(Lexer *self)
             exit(1);
         }
 
-        self->cur++;
+        lexer_advance(self, 1);
 
         double fracpart = 0;
         double factor   = 0.1;
@@ -129,17 +152,19 @@ Token lex_number(Lexer *self)
             fracpart += factor * char_to_digit(self->text[self->cur]);
             factor /= 10.0;
 
-            self->cur++;
+            lexer_advance(self, 1);
         }
 
         return (Token) {
             .type     = TOK_TYPE_FLOAT,
             .floatval = ((double) num + fracpart),
+            .loc      = loc,
         };
     } else {
         return (Token) {
             .type   = TOK_TYPE_INT,
             .intval = num,
+            .loc    = loc,
         };
     }
 }
@@ -149,9 +174,10 @@ Token lex_number(Lexer *self)
 // we want to deal with in the parser. Time will tell.
 Token lex_token(Lexer *self)
 {
+    lexer_trim_left(self);
+
     Token res = {0};
-    while (self->cur < self->text_len && isspace(self->text[self->cur]))
-        self->cur++;
+    res.loc   = self->loc;
 
     if (self->cur >= self->text_len) {
         return res;
@@ -181,11 +207,19 @@ Token lex_token(Lexer *self)
     assert(0 && "could not lex text");
 }
 
+inline void loc_print(FILE *f, FileLoc loc)
+{
+    fprintf(f, SV_FMT ":%" PRIu32 ":%" PRIu32, SV_ARG(loc.file), loc.line,
+            loc.col);
+}
+
 static_assert(
     TOK_TYPE__COUNT == 15,
     "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {
+    loc_print(f, tok.loc);
+    fprintf(f, ": ");
     if (tok_is_keyword(tok)) {
         fprintf(f, "KW(" SV_FMT ")", SV_ARG(TOK_NAMES[tok.type]));
     } else if (tok_is_symb(tok)) {
@@ -221,6 +255,16 @@ void token_print(FILE *f, Token tok)
 
 Lexer lexer_from_cstr(const char *text)
 {
-    return (Lexer) {.text = text, .text_len = strlen(text), .cur = 0};
+    return (Lexer) {
+        .loc =
+            {
+                .file = SV(""),
+                .col  = 1,
+                .line = 1,
+            },
+        .text     = text,
+        .text_len = strlen(text),
+        .cur      = 0,
+    };
 }
 
