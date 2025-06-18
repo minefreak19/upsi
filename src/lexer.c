@@ -26,17 +26,17 @@ static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_RPAREN]    = SV(")"),
 };
 
-bool tok_is_keyword(Token tok)
+static inline bool tok_is_keyword(Token tok)
 {
     return TOK_TYPE__KW_START <= tok.type && tok.type < TOK_TYPE__KW_END;
 }
 
-bool tok_is_symb(Token tok)
+static inline bool tok_is_symb(Token tok)
 {
     return TOK_TYPE__SYMB_START <= tok.type && tok.type < TOK_TYPE__SYMB_END;
 }
 
-bool is_symb(char c)
+static bool is_symb(char c)
 {
     // TODO: For any potential multi-character symbols, should this function
     // return true for all characters or only the first character of each
@@ -48,7 +48,7 @@ bool is_symb(char c)
 }
 
 // TODO: Handle different types of line endings properly (LF/CRLF/CR)
-void lexer_advance(Lexer *self, size_t n)
+static void lexer_advance(Lexer *self, size_t n)
 {
     for (size_t i = 0; i < n; i++) {
         if (self->text[self->cur] == '\n') {
@@ -60,14 +60,14 @@ void lexer_advance(Lexer *self, size_t n)
     }
 }
 
-void lexer_trim_left(Lexer *self)
+static inline void lexer_trim_left(Lexer *self)
 {
     while (self->cur < self->text_len && isspace(self->text[self->cur])) {
         lexer_advance(self, 1);
     }
 }
 
-bool try_lex_symb(Lexer *self, Token *resp)
+static bool try_lex_symb(Lexer *self, Token *resp)
 {
     if (self->cur >= self->text_len) {
         return false;
@@ -87,7 +87,7 @@ bool try_lex_symb(Lexer *self, Token *resp)
     return false;
 }
 
-bool try_lex_word(Lexer *self, StringView *resp)
+static bool try_lex_word(Lexer *self, StringView *resp)
 {
     if (self->cur >= self->text_len) {
         return false;
@@ -112,13 +112,13 @@ bool try_lex_word(Lexer *self, StringView *resp)
     return true;
 }
 
-long char_to_digit(char c)
+static inline long char_to_digit(char c)
 {
     assert(isdigit(c));
     return c - '0';
 }
 
-Token lex_number(Lexer *self)
+static Token lex_number(Lexer *self)
 {
     assert(isdigit(self->text[self->cur]));
 
@@ -253,7 +253,7 @@ void token_print(FILE *f, Token tok)
     }
 }
 
-Lexer lexer_from_cstr(const char *text)
+inline Lexer lexer_from_cstr(const char *text)
 {
     return (Lexer) {
         .loc =

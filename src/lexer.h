@@ -55,9 +55,6 @@ typedef struct {
     FileLoc loc;
 } Lexer;
 
-bool is_symb(char c);
-bool try_lex_symb(Lexer *self, Token *resp);
-bool try_lex_word(Lexer *self, StringView *resp);
 Token lex_token(Lexer *self);
 void loc_print(FILE *f, FileLoc loc);
 void token_print(FILE *f, Token tok);
