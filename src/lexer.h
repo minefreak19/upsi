@@ -32,8 +32,7 @@ typedef enum {
 
     TOK_TYPE_NAME,
     // TODO: Do we need INT and FLOAT to be separate?
-    TOK_TYPE_INT,
-    TOK_TYPE_FLOAT,
+    TOK_TYPE_NUM,
 
     TOK_TYPE__COUNT,
 } TokenType;
@@ -43,8 +42,7 @@ typedef struct {
     TokenType type;
     union {
         StringView name;
-        int64_t intval;
-        double floatval;
+        double numval;
     };
 } Token;
 

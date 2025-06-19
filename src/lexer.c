@@ -11,7 +11,7 @@
 
 #include "sv.h"
 
-static_assert(TOK_TYPE__COUNT == 15,
+static_assert(TOK_TYPE__COUNT == 14,
               "Exhaustive definition of TOK_NAMES wrt TokenType's");
 static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_KEYWORD_DIM]  = SV("dim"),
@@ -133,6 +133,7 @@ static Token lex_number(Lexer *self)
         lexer_advance(self, 1);
     }
 
+    // TODO: Clean up this code
     if (self->cur < self->text_len && self->text[self->cur] == '.') {
         if (self->cur + 1 >= self->text_len ||
             !isdigit(self->text[self->cur + 1])) {
@@ -156,14 +157,14 @@ static Token lex_number(Lexer *self)
         }
 
         return (Token) {
-            .type     = TOK_TYPE_FLOAT,
-            .floatval = ((double) num + fracpart),
-            .loc      = loc,
+            .type   = TOK_TYPE_NUM,
+            .numval = ((double) num + fracpart),
+            .loc    = loc,
         };
     } else {
         return (Token) {
-            .type   = TOK_TYPE_INT,
-            .intval = num,
+            .type   = TOK_TYPE_NUM,
+            .numval = num,
             .loc    = loc,
         };
     }
@@ -214,7 +215,7 @@ inline void loc_print(FILE *f, FileLoc loc)
 }
 
 static_assert(
-    TOK_TYPE__COUNT == 15,
+    TOK_TYPE__COUNT == 14,
     "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {
@@ -234,12 +235,8 @@ void token_print(FILE *f, Token tok)
             fprintf(f, "NAME(" SV_FMT ")", SV_ARG(tok.name));
         } break;
 
-        case TOK_TYPE_INT: {
-            fprintf(f, "INT(%" PRIi64 ")", tok.intval);
-        } break;
-
-        case TOK_TYPE_FLOAT: {
-            fprintf(f, "FLOAT(%f)", tok.floatval);
+        case TOK_TYPE_NUM: {
+            fprintf(f, "FLOAT(%f)", tok.numval);
         } break;
 
         default: {
