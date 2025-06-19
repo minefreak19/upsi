@@ -54,6 +54,7 @@ typedef struct {
 } Lexer;
 
 Token lex_token(Lexer *self);
+Token peek_token(Lexer self);
 void loc_print(FILE *f, FileLoc loc);
 void token_print(FILE *f, Token tok);
 Lexer lexer_from_cstr(const char *text);

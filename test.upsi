@@ -3,6 +3,6 @@
 
     ;;;unit metre: length;  
 
-unit mile: length = 1.6 * 1000 metre;
+unit mile: length = 1600 metre;
 
-unit yard: length = (1 / 1760) mile; 
+unit yard: length = (1) / 1760) mile; 

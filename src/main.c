@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "lexer.h"
+#include "parser.h"
 
 #define SV_IMPLEMENTATION
 #include "sv.h"
@@ -76,11 +77,17 @@ int main(int argc, char **argv)
     Lexer lexer    = lexer_from_cstr(text);
     lexer.loc.file = sv_from_cstr(args.source_file);
 
-    for (Token tok = lex_token(&lexer); tok.type != TOK_TYPE_NONE;
-         tok       = lex_token(&lexer)) {
-        token_print(stdout, tok);
-        putc('\n', stdout);
+    Parser parser = {
+        .lexer = lexer,
+    };
+
+    for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
+         stmt      = parse_stmt(&parser)) {
+        stmt_print(stdout, stmt);
+        fputc('\n', stdout);
     }
+
+    // TODO: It will probably be necessary to specify a fundamental unit for each dimension at time of dimension declaration
 
     free((void *) text);
     return 0;

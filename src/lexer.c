@@ -208,6 +208,11 @@ Token lex_token(Lexer *self)
     assert(0 && "could not lex text");
 }
 
+Token peek_token(Lexer self)
+{
+    return lex_token(&self);
+}
+
 inline void loc_print(FILE *f, FileLoc loc)
 {
     fprintf(f, SV_FMT ":%" PRIu32 ":%" PRIu32, SV_ARG(loc.file), loc.line,
