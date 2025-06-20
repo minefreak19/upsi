@@ -13,6 +13,7 @@ typedef struct {
 } FileLoc; 
 
 typedef enum {
+    // TODO: Should there be a separate TokenType to mark EOF? Currently NONE is used.
     TOK_TYPE_NONE = 0,
 
     TOK_TYPE__KW_START,

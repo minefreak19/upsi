@@ -168,6 +168,11 @@ Stmt parse_stmt(Parser *self)
     Token tok = lex_token(&self->lexer);
 
     switch (tok.type) {
+    case TOK_TYPE_NONE: 
+        return (Stmt) {
+            .type = STMT_TYPE_NONE,
+        }; 
+        
     case TOK_TYPE_KEYWORD_DIM:
         return parse_dim_decl(self);
 
