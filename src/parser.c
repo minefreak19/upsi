@@ -29,29 +29,38 @@ static Expr *parser_save_expr(Parser *self, Expr expr)
     return &self->exprs[self->exprs_count - 1];
 }
 
-static Expr parse_expr(Parser *self)
+static Expr parse_primary_expr(Parser *self) 
 {
-    Token tok = lex_token(&self->lexer);
+    Token tok = lex_token(&self->lexer); 
 
-    switch (tok.type) {
-        // TODO: Binary expressions
-
-    case TOK_TYPE_NUM: {
+    if (tok.type == TOK_TYPE_NUM) {
         Expr res = {
-            .type       = EXPR_TYPE_NUM,
+            .type = EXPR_TYPE_NUM, 
             .as.num.val = tok.numval,
+            .as.num.unit = SV(""),
         };
 
         Token next = peek_token(self->lexer);
-
         if (next.type == TOK_TYPE_NAME) {
-            lex_token(&self->lexer);
-            res.as.num.unit = next.name;
+            lex_token(&self->lexer); 
+            res.as.num.unit = next.name; 
         }
-        return res;
-    } break;
 
-    case TOK_TYPE_LPAREN: {
+        return res; 
+    }
+
+    // TODO: Add an ExprType for variables
+    loc_print(stderr, tok.loc); 
+    fprintf(stderr, ": ERROR: Unexpected primary expression\n"); 
+    exit(1);
+}
+
+static Expr parse_expr(Parser *self)
+{
+    Token next = peek_token(self->lexer);
+
+    if (next.type == TOK_TYPE_LPAREN) {
+        lex_token(&self->lexer); 
         Expr inner    = parse_expr(self);
         Token closing = lex_token(&self->lexer);
         // TODO: Report location of opening parenthesis here
@@ -61,13 +70,9 @@ static Expr parse_expr(Parser *self)
             .type           = EXPR_TYPE_PAREN,
             .as.paren.inner = parser_save_expr(self, inner),
         };
-    } break;
-
-    default:
-        token_print(stderr, tok);
-        fprintf(stderr, ": Unexpected start of expression\n");
-        exit(1);
     }
+
+    return parse_primary_expr(self); 
 }
 
 static Stmt parse_dim_decl(Parser *self)

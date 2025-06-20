@@ -3,6 +3,23 @@
 
 #include "lexer.h"
 
+/*
+ * GRAMMAR
+ * =======
+ *
+ * program = [statement]
+ *
+ * statement = dimDecl | unitDecl
+ *
+ * dimDecl = "dim" NAME ";"
+ *
+ * unitDecl = "unit" NAME ":" NAME ("=" expr)? ";"
+ *
+ * expr = "(" expr ")" | primaryExpr
+ *
+ * primaryExpr = NUM NAME? | NAME
+ */
+
 typedef enum {
     EXPR_TYPE_NONE = 0,
 
@@ -60,7 +77,7 @@ typedef struct {
     Lexer lexer;
 
     /// Buffer of expressions that outputted Exprs might have pointers to
-    // TODO: Is there a better way to implement this? 
+    // TODO: Is there a better way to implement this?
     Expr exprs[PARSER_EXPRS_CAP];
     size_t exprs_count;
 } Parser;
