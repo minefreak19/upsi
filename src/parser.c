@@ -112,7 +112,32 @@ static Expr parse_geom_expr(Parser *self)
     };
 }
 
-Expr parse_expr(Parser *self) { return parse_geom_expr(self); }
+static Expr parse_assignment_expr(Parser *self)
+{
+    // The implementation here deviates from the grammar slightly so as to not
+    // rely on peeking more than 1 token ahead (which would be required to check
+    // for both a variable name and an `=`).
+
+    Expr lhs = parse_geom_expr(self);
+
+    Token next = peek_token(self->lexer);
+    if (lhs.type == EXPR_TYPE_VAR && next.type == TOK_TYPE_EQ) {
+        lex_token(&self->lexer);
+        Expr rhs = parse_expr(self);
+        return (Expr) {
+            .type = EXPR_TYPE_ASSIGN,
+            .as.assign =
+                {
+                    .lhs = lhs.as.var.name,
+                    .rhs = parser_save_expr(self, rhs),
+                },
+        };
+    } else {
+        return lhs;
+    }
+}
+
+Expr parse_expr(Parser *self) { return parse_assignment_expr(self); }
 
 /// These functions assume that the corresponding keyword has already been
 /// consumed.
@@ -201,32 +226,46 @@ static Stmt parse_var_decl(Parser *self)
 
 Stmt parse_stmt(Parser *self)
 {
-    Token tok = lex_token(&self->lexer);
+    Token tok = peek_token(self->lexer);
 
     switch (tok.type) {
     case TOK_TYPE_NONE:
+        lex_token(&self->lexer);
         return (Stmt) {
             .type = STMT_TYPE_NONE,
         };
 
     case TOK_TYPE_KEYWORD_DIM:
+        // TODO: Refactor this so that the consumption of the keyword token
+        // happens in the corresponding function
+        lex_token(&self->lexer);
         return parse_dim_decl(self);
 
     case TOK_TYPE_KEYWORD_UNIT:
+        lex_token(&self->lexer);
         return parse_unit_decl(self);
 
     case TOK_TYPE_KEYWORD_LET:
+        lex_token(&self->lexer);
         return parse_var_decl(self);
 
     case TOK_TYPE_SEMICOLON:
         // Semicolon at the start of an expr implies an empty statement and can
         // be ignored
-
-        // TODO: Evaluate whether this means the language can be
-        // semicolon-optional
+        lex_token(&self->lexer);
         return parse_stmt(self);
 
-    default:
+    default: {
+        // (don't consume tok, as it's needed for the expression parser)
+        Expr expr = parse_expr(self);
+        ensure_tok_type(lex_token(&self->lexer), TOK_TYPE_SEMICOLON,
+                        "semicolon after expression statement");
+
+        return (Stmt) {
+            .type    = STMT_TYPE_EXPR,
+            .as.expr = expr,
+        };
+    }
         token_print(stderr, tok);
         fprintf(stderr, ": Unexpected start of statement\n");
         exit(1);
@@ -256,7 +295,7 @@ void op_print(FILE *f, Op op)
 }
 
 static_assert(
-    EXPR_TYPE__COUNT == 5,
+    EXPR_TYPE__COUNT == 6,
     "Exhaustive definition of expr_print() with respect to ExprType's");
 void expr_print(FILE *f, Expr expr)
 {
@@ -290,13 +329,21 @@ void expr_print(FILE *f, Expr expr)
         fprintf(f, ")");
     } break;
 
+    case EXPR_TYPE_ASSIGN: {
+        fprintf(f, "Assign(");
+        fprintf(f, "`" SV_FMT "`", SV_ARG(expr.as.assign.lhs));
+        fprintf(f, ", ");
+        expr_print(f, *expr.as.assign.rhs);
+        fprintf(f, ")");
+    } break;
+
     default:
         assert(0 && "Unreachable");
     }
 }
 
 static_assert(
-    STMT_TYPE__COUNT == 4,
+    STMT_TYPE__COUNT == 5,
     "Exhaustive definition of stmt_print() with respect to StmtType's");
 void stmt_print(FILE *f, Stmt stmt)
 {
@@ -326,6 +373,12 @@ void stmt_print(FILE *f, Stmt stmt)
             fprintf(f, ", value = ");
             expr_print(f, stmt.as.unit_decl.value);
         }
+        fputc(')', f);
+    } break;
+
+    case STMT_TYPE_EXPR: {
+        fprintf(f, "Expr("); 
+        expr_print(f, stmt.as.expr);
         fputc(')', f);
     } break;
 

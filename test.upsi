@@ -6,5 +6,7 @@ unit mile: length = 1.6 * 1000 metre;
 unit yard: length = ((1 mile) / 1760); 
 
 let y: length;
-let x: length  = 1 mile; 
+let x: length = 1 mile; 
 let z: length = 2 * x;
+
+y = 0.33 / z;

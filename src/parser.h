@@ -3,13 +3,15 @@
 
 #include "lexer.h"
 
+// TODO: Add a way to automatically add metric prefixes to a unit through an
+// annotation
 /*
- * GRAMMAR
+ * GRAMMAR (recursive descent)
  * =======
  *
  * program = [statement]
  *
- * statement = dimDecl | unitDecl | varDecl
+ * statement = dimDecl | unitDecl | varDecl | expr ";"
  *
  * dimDecl = "dim" NAME ";"
  *
@@ -17,9 +19,11 @@
  *
  * varDecl = "let" NAME ":" NAME ("=" expr)? ";"
  *
- * expr = geomExpr
+ * expr = assignmentExpr
  *
- * geomExpr = primaryExpr ("*" | "/") expr
+ * assignmentExpr = NAME "=" expr | geomExpr
+ *
+ * geomExpr = primaryExpr (("*" | "/") expr)?
  *
  * primaryExpr = "(" expr ")" | NUM NAME? | NAME
  */
@@ -32,6 +36,7 @@ typedef enum {
     EXPR_TYPE_VAR,
     EXPR_TYPE_PAREN,
     EXPR_TYPE_BINOP,
+    EXPR_TYPE_ASSIGN,
 
     EXPR_TYPE__COUNT,
 } ExprType;
@@ -55,7 +60,7 @@ typedef struct Expr {
         } num;
 
         struct {
-            StringView name; 
+            StringView name;
         } var;
 
         struct {
@@ -67,6 +72,13 @@ typedef struct Expr {
             struct Expr *right;
             Op op;
         } binop;
+
+        // TODO: Is assignment really just a binary operation? Can this be
+        // achieved by implementing pattern matching?
+        struct {
+            StringView lhs;
+            struct Expr *rhs;
+        } assign;
     } as;
 } Expr;
 
@@ -76,6 +88,7 @@ typedef enum {
     STMT_TYPE_DIM_DECL,
     STMT_TYPE_UNIT_DECL,
     STMT_TYPE_VAR_DECL,
+    STMT_TYPE_EXPR,
 
     STMT_TYPE__COUNT
 } StmtType;
@@ -98,10 +111,12 @@ typedef struct {
         // TODO: Does this mean that variables and units are equivalent?
         struct {
             StringView dim;
-            StringView name; 
+            StringView name;
 
             Expr value;
         } var_decl;
+
+        Expr expr;
     } as;
 } Stmt;
 
