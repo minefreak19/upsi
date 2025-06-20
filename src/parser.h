@@ -9,11 +9,13 @@
  *
  * program = [statement]
  *
- * statement = dimDecl | unitDecl
+ * statement = dimDecl | unitDecl | varDecl
  *
  * dimDecl = "dim" NAME ";"
  *
  * unitDecl = "unit" NAME ":" NAME ("=" expr)? ";"
+ *
+ * varDecl = "let" NAME ":" NAME ("=" expr)? ";"
  *
  * expr = geomExpr
  *
@@ -22,10 +24,12 @@
  * primaryExpr = "(" expr ")" | NUM NAME? | NAME
  */
 
+// TODO: Add file locations to Expr and Stmt for error reporting in interpreter
 typedef enum {
     EXPR_TYPE_NONE = 0,
 
     EXPR_TYPE_NUM,
+    EXPR_TYPE_VAR,
     EXPR_TYPE_PAREN,
     EXPR_TYPE_BINOP,
 
@@ -51,6 +55,10 @@ typedef struct Expr {
         } num;
 
         struct {
+            StringView name; 
+        } var;
+
+        struct {
             struct Expr *inner;
         } paren;
 
@@ -67,6 +75,7 @@ typedef enum {
 
     STMT_TYPE_DIM_DECL,
     STMT_TYPE_UNIT_DECL,
+    STMT_TYPE_VAR_DECL,
 
     STMT_TYPE__COUNT
 } StmtType;
@@ -85,6 +94,14 @@ typedef struct {
 
             Expr value;
         } unit_decl;
+
+        // TODO: Does this mean that variables and units are equivalent?
+        struct {
+            StringView dim;
+            StringView name; 
+
+            Expr value;
+        } var_decl;
     } as;
 } Stmt;
 

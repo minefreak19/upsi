@@ -9,7 +9,7 @@
 // relying on the Lexer to continually supply tokens?
 
 static_assert(
-    TOK_TYPE__COUNT == 14,
+    TOK_TYPE__COUNT == 15,
     "Exhaustive definition of op_from_tok_type with respect to TokenType's");
 static_assert(OP__COUNT == 3,
               "Exhaustive definition of op_from_tok_type with respect to Op's");
@@ -76,9 +76,13 @@ static Expr parse_primary_expr(Parser *self)
         }
 
         return res;
-    } 
+    } else if (tok.type == TOK_TYPE_NAME) {
+        return (Expr) {
+            .type        = EXPR_TYPE_VAR,
+            .as.var.name = tok.name,
+        };
+    }
 
-    // TODO: Add an ExprType for variables
     loc_print(stderr, tok.loc);
     fprintf(stderr, ": ERROR: Unexpected primary expression\n");
     exit(1);
@@ -108,11 +112,10 @@ static Expr parse_geom_expr(Parser *self)
     };
 }
 
-Expr parse_expr(Parser *self)
-{
-    return parse_geom_expr(self);
-}
+Expr parse_expr(Parser *self) { return parse_geom_expr(self); }
 
+/// These functions assume that the corresponding keyword has already been
+/// consumed.
 static Stmt parse_dim_decl(Parser *self)
 {
     Stmt res = {0};
@@ -163,21 +166,57 @@ static Stmt parse_unit_decl(Parser *self)
     return res;
 }
 
+static Stmt parse_var_decl(Parser *self)
+{
+    Token name = lex_token(&self->lexer);
+    ensure_tok_type(name, TOK_TYPE_NAME, "variable name");
+
+    Token colon = lex_token(&self->lexer);
+    ensure_tok_type(colon, TOK_TYPE_COLON,
+                    "`:` followed by dimension of variable");
+
+    Token dim = lex_token(&self->lexer);
+    ensure_tok_type(dim, TOK_TYPE_NAME, "name of dimension of variable");
+
+    Token next = lex_token(&self->lexer);
+    Expr value = {0};
+    if (next.type == TOK_TYPE_EQ) {
+        value = parse_expr(self);
+        next  = lex_token(&self->lexer);
+    }
+
+    ensure_tok_type(next, TOK_TYPE_SEMICOLON,
+                    "a semicolon after variable declaration");
+
+    return (Stmt) {
+        .type = STMT_TYPE_VAR_DECL,
+        .as.var_decl =
+            {
+                .dim   = dim.name,
+                .name  = name.name,
+                .value = value,
+            },
+    };
+}
+
 Stmt parse_stmt(Parser *self)
 {
     Token tok = lex_token(&self->lexer);
 
     switch (tok.type) {
-    case TOK_TYPE_NONE: 
+    case TOK_TYPE_NONE:
         return (Stmt) {
             .type = STMT_TYPE_NONE,
-        }; 
-        
+        };
+
     case TOK_TYPE_KEYWORD_DIM:
         return parse_dim_decl(self);
 
     case TOK_TYPE_KEYWORD_UNIT:
         return parse_unit_decl(self);
+
+    case TOK_TYPE_KEYWORD_LET:
+        return parse_var_decl(self);
 
     case TOK_TYPE_SEMICOLON:
         // Semicolon at the start of an expr implies an empty statement and can
@@ -217,7 +256,7 @@ void op_print(FILE *f, Op op)
 }
 
 static_assert(
-    EXPR_TYPE__COUNT == 4,
+    EXPR_TYPE__COUNT == 5,
     "Exhaustive definition of expr_print() with respect to ExprType's");
 void expr_print(FILE *f, Expr expr)
 {
@@ -229,6 +268,10 @@ void expr_print(FILE *f, Expr expr)
     case EXPR_TYPE_NUM: {
         fprintf(f, "Num(%f `" SV_FMT "`)", expr.as.num.val,
                 SV_ARG(expr.as.num.unit));
+    } break;
+
+    case EXPR_TYPE_VAR: {
+        fprintf(f, "Var(`" SV_FMT "`)", SV_ARG(expr.as.var.name));
     } break;
 
     case EXPR_TYPE_PAREN: {
@@ -253,7 +296,7 @@ void expr_print(FILE *f, Expr expr)
 }
 
 static_assert(
-    STMT_TYPE__COUNT == 3,
+    STMT_TYPE__COUNT == 4,
     "Exhaustive definition of stmt_print() with respect to StmtType's");
 void stmt_print(FILE *f, Stmt stmt)
 {
@@ -268,6 +311,16 @@ void stmt_print(FILE *f, Stmt stmt)
 
     case STMT_TYPE_UNIT_DECL: {
         fprintf(f, "UnitDecl(name = `" SV_FMT "`, dim = `" SV_FMT "`",
+                SV_ARG(stmt.as.unit_decl.name), SV_ARG(stmt.as.unit_decl.dim));
+        if (stmt.as.unit_decl.value.type != EXPR_TYPE_NONE) {
+            fprintf(f, ", value = ");
+            expr_print(f, stmt.as.unit_decl.value);
+        }
+        fputc(')', f);
+    } break;
+
+    case STMT_TYPE_VAR_DECL: {
+        fprintf(f, "VarDecl(name = `" SV_FMT "`, dim = `" SV_FMT "`",
                 SV_ARG(stmt.as.unit_decl.name), SV_ARG(stmt.as.unit_decl.dim));
         if (stmt.as.unit_decl.value.type != EXPR_TYPE_NONE) {
             fprintf(f, ", value = ");

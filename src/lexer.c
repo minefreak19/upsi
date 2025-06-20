@@ -11,11 +11,12 @@
 
 #include "sv.h"
 
-static_assert(TOK_TYPE__COUNT == 14,
+static_assert(TOK_TYPE__COUNT == 15,
               "Exhaustive definition of TOK_NAMES wrt TokenType's");
 static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_KEYWORD_DIM]  = SV("dim"),
     [TOK_TYPE_KEYWORD_UNIT] = SV("unit"),
+    [TOK_TYPE_KEYWORD_LET]  = SV("let"),
 
     [TOK_TYPE_SEMICOLON] = SV(";"),
     [TOK_TYPE_COLON]     = SV(":"),
@@ -208,10 +209,7 @@ Token lex_token(Lexer *self)
     assert(0 && "could not lex text");
 }
 
-Token peek_token(Lexer self)
-{
-    return lex_token(&self);
-}
+Token peek_token(Lexer self) { return lex_token(&self); }
 
 inline void loc_print(FILE *f, FileLoc loc)
 {
@@ -220,7 +218,7 @@ inline void loc_print(FILE *f, FileLoc loc)
 }
 
 static_assert(
-    TOK_TYPE__COUNT == 14,
+    TOK_TYPE__COUNT == 15,
     "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {
