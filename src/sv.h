@@ -18,6 +18,7 @@ typedef struct {
 
 StringView sv_from_cstr(const char *cstr);
 bool sv_eq(StringView a, StringView b);
+bool sv_is_empty(StringView sv);
 
 #endif  // SV_H_
 
@@ -35,6 +36,11 @@ StringView sv_from_cstr(const char *cstr)
 bool sv_eq(StringView a, StringView b)
 {
     return a.len == b.len && strncmp(a.text, b.text, a.len) == 0;
+}
+
+// TODO: Should this also consider NULL-pointers as empty?
+bool sv_is_empty(StringView sv) {
+    return sv.len == 0;
 }
 
 #endif  // SV_IMPLEMENTATION

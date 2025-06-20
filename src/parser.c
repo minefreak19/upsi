@@ -302,8 +302,11 @@ void expr_print(FILE *f, Expr expr)
     } break;
 
     case EXPR_TYPE_NUM: {
-        fprintf(f, "Num(%f `" SV_FMT "`)", expr.as.num.val,
-                SV_ARG(expr.as.num.unit));
+        fprintf(f, "Num(%f", expr.as.num.val);
+        if (!sv_is_empty(expr.as.num.unit)) {
+            fprintf(f, " `" SV_FMT "`", SV_ARG(expr.as.num.unit));
+        }
+        fputc(')', f);
     } break;
 
     case EXPR_TYPE_VAR: {
@@ -374,7 +377,7 @@ void stmt_print(FILE *f, Stmt stmt)
     } break;
 
     case STMT_TYPE_EXPR: {
-        fprintf(f, "Expr("); 
+        fprintf(f, "Expr(");
         expr_print(f, stmt.as.expr);
         fputc(')', f);
     } break;

@@ -10,4 +10,4 @@ let x: length = 1 mile;
 let z: length = 2 * x;
 
 // This is a comment
- =y = 0.33 / z;
+y = 0.33 / z;
