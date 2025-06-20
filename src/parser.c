@@ -13,7 +13,7 @@ static_assert(
     "Exhaustive definition of op_from_tok_type with respect to TokenType's");
 static_assert(OP__COUNT == 3,
               "Exhaustive definition of op_from_tok_type with respect to Op's");
-Op op_from_tok_type(TokenType type)
+static Op op_from_tok_type(TokenType type)
 {
     switch (type) {
     case TOK_TYPE_STAR:
