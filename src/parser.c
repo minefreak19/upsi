@@ -266,9 +266,6 @@ Stmt parse_stmt(Parser *self)
             .as.expr = expr,
         };
     }
-        token_print(stderr, tok);
-        fprintf(stderr, ": Unexpected start of statement\n");
-        exit(1);
     }
 }
 
