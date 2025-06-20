@@ -15,9 +15,11 @@
  *
  * unitDecl = "unit" NAME ":" NAME ("=" expr)? ";"
  *
- * expr = "(" expr ")" | primaryExpr
+ * expr = geomExpr
  *
- * primaryExpr = NUM NAME? | NAME
+ * geomExpr = primaryExpr ("*" | "/") expr
+ *
+ * primaryExpr = "(" expr ")" | NUM NAME? | NAME
  */
 
 typedef enum {
@@ -25,21 +27,38 @@ typedef enum {
 
     EXPR_TYPE_NUM,
     EXPR_TYPE_PAREN,
+    EXPR_TYPE_BINOP,
 
     EXPR_TYPE__COUNT,
 } ExprType;
+
+typedef enum {
+    OP_NONE = 0,
+
+    OP_MULT,
+    OP_DIV,
+
+    OP__COUNT,
+} Op;
 
 typedef struct Expr {
     ExprType type;
     union {
         struct {
             double val;
+            /// Unitless quantities should have unit = SV("")
             StringView unit;
         } num;
 
         struct {
             struct Expr *inner;
         } paren;
+
+        struct {
+            struct Expr *left;
+            struct Expr *right;
+            Op op;
+        } binop;
     } as;
 } Expr;
 
@@ -82,6 +101,7 @@ typedef struct {
     size_t exprs_count;
 } Parser;
 
+Expr parse_expr(Parser *self);
 Stmt parse_stmt(Parser *self);
 
 #endif  // PARSER_H_

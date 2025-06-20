@@ -8,6 +8,23 @@
 // TODO: Should Parser have a full list of tokens and a cursor, rather than
 // relying on the Lexer to continually supply tokens?
 
+static_assert(
+    TOK_TYPE__COUNT == 14,
+    "Exhaustive definition of op_from_tok_type with respect to TokenType's");
+static_assert(OP__COUNT == 3,
+              "Exhaustive definition of op_from_tok_type with respect to Op's");
+Op op_from_tok_type(TokenType type)
+{
+    switch (type) {
+    case TOK_TYPE_STAR:
+        return OP_MULT;
+    case TOK_TYPE_SLASH:
+        return OP_DIV;
+    default:
+        return OP_NONE;
+    }
+}
+
 // TODO: Lookup table of humanised names of token types for error messages,
 // allowing expected_str to be NULL if not needed to be specified
 static void ensure_tok_type(Token tok, TokenType type, const char *expected_str)
@@ -29,38 +46,13 @@ static Expr *parser_save_expr(Parser *self, Expr expr)
     return &self->exprs[self->exprs_count - 1];
 }
 
-static Expr parse_primary_expr(Parser *self) 
+// TODO: These functions can probably accept the next token if it's already
+// peeked, thus saving redoing some of the lexing work
+static Expr parse_primary_expr(Parser *self)
 {
-    Token tok = lex_token(&self->lexer); 
+    Token tok = lex_token(&self->lexer);
 
-    if (tok.type == TOK_TYPE_NUM) {
-        Expr res = {
-            .type = EXPR_TYPE_NUM, 
-            .as.num.val = tok.numval,
-            .as.num.unit = SV(""),
-        };
-
-        Token next = peek_token(self->lexer);
-        if (next.type == TOK_TYPE_NAME) {
-            lex_token(&self->lexer); 
-            res.as.num.unit = next.name; 
-        }
-
-        return res; 
-    }
-
-    // TODO: Add an ExprType for variables
-    loc_print(stderr, tok.loc); 
-    fprintf(stderr, ": ERROR: Unexpected primary expression\n"); 
-    exit(1);
-}
-
-static Expr parse_expr(Parser *self)
-{
-    Token next = peek_token(self->lexer);
-
-    if (next.type == TOK_TYPE_LPAREN) {
-        lex_token(&self->lexer); 
+    if (tok.type == TOK_TYPE_LPAREN) {
         Expr inner    = parse_expr(self);
         Token closing = lex_token(&self->lexer);
         // TODO: Report location of opening parenthesis here
@@ -70,9 +62,55 @@ static Expr parse_expr(Parser *self)
             .type           = EXPR_TYPE_PAREN,
             .as.paren.inner = parser_save_expr(self, inner),
         };
+    } else if (tok.type == TOK_TYPE_NUM) {
+        Expr res = {
+            .type        = EXPR_TYPE_NUM,
+            .as.num.val  = tok.numval,
+            .as.num.unit = SV(""),
+        };
+
+        Token next = peek_token(self->lexer);
+        if (next.type == TOK_TYPE_NAME) {
+            lex_token(&self->lexer);
+            res.as.num.unit = next.name;
+        }
+
+        return res;
+    } 
+
+    // TODO: Add an ExprType for variables
+    loc_print(stderr, tok.loc);
+    fprintf(stderr, ": ERROR: Unexpected primary expression\n");
+    exit(1);
+}
+
+static Expr parse_geom_expr(Parser *self)
+{
+    Expr left = parse_primary_expr(self);
+
+    Token next = peek_token(self->lexer);
+    Op op      = op_from_tok_type(next.type);
+    if (op == OP_NONE) {
+        return left;
     }
 
-    return parse_primary_expr(self); 
+    lex_token(&self->lexer);
+    Expr right = parse_expr(self);
+
+    return (Expr) {
+        .type = EXPR_TYPE_BINOP,
+        .as.binop =
+            {
+                .op    = op,
+                .left  = parser_save_expr(self, left),
+                .right = parser_save_expr(self, right),
+            },
+    };
+}
+
+Expr parse_expr(Parser *self)
+{
+    return parse_geom_expr(self);
 }
 
 static Stmt parse_dim_decl(Parser *self)
@@ -151,8 +189,30 @@ Stmt parse_stmt(Parser *self)
     }
 }
 
+static_assert(OP__COUNT == 3,
+              "Exhaustive definition of op_print() with respect to Op's");
+void op_print(FILE *f, Op op)
+{
+    switch (op) {
+    case OP_NONE: {
+        fprintf(f, "None");
+    } break;
+
+    case OP_MULT: {
+        fprintf(f, "Mult");
+    } break;
+
+    case OP_DIV: {
+        fprintf(f, "Div");
+    } break;
+
+    default:
+        assert(0 && "Unreachable");
+    }
+}
+
 static_assert(
-    EXPR_TYPE__COUNT == 3,
+    EXPR_TYPE__COUNT == 4,
     "Exhaustive definition of expr_print() with respect to ExprType's");
 void expr_print(FILE *f, Expr expr)
 {
@@ -169,6 +229,16 @@ void expr_print(FILE *f, Expr expr)
     case EXPR_TYPE_PAREN: {
         fprintf(f, "Paren(");
         expr_print(f, *expr.as.paren.inner);
+        fprintf(f, ")");
+    } break;
+
+    case EXPR_TYPE_BINOP: {
+        fprintf(f, "BinOp(");
+        expr_print(f, *expr.as.binop.left);
+        fprintf(f, ", ");
+        op_print(f, expr.as.binop.op);
+        fprintf(f, ", ");
+        expr_print(f, *expr.as.binop.right);
         fprintf(f, ")");
     } break;
 
