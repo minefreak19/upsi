@@ -102,12 +102,16 @@ static bool try_lex_word(Lexer *self, StringView *resp)
     while (self->cur < self->text_len) {
         char c = self->text[self->cur];
         if (isspace(c) || is_symb(c)) {
+            if (res.len == 0) return false;
+
             *resp = res;
             return true;
         }
         lexer_advance(self, 1);
         res.len++;
     }
+
+    if (res.len == 0) return false;
 
     *resp = res;
     return true;
