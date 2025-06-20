@@ -178,6 +178,14 @@ Token lex_token(Lexer *self)
 {
     lexer_trim_left(self);
 
+    // Skip comment, if any
+    if (self->cur + 1 < self->text_len && self->text[self->cur] == '/' && self->text[self->cur + 1] == '/') {
+        while (self->text[self->cur] != '\n') {
+            lexer_advance(self, 1);
+        }
+        lexer_trim_left(self);
+    }
+
     Token res = {0};
     res.loc   = self->loc;
 
