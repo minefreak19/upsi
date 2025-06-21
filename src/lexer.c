@@ -194,7 +194,7 @@ Token lex_token(Lexer *self)
         while (self->text[self->cur] != '\n') {
             lexer_advance(self, 1);
         }
-        lexer_trim_left(self);
+        return lex_token(self);
     }
 
     Token res = {0};

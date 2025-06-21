@@ -5,13 +5,13 @@ unit mile: length = 1.6 * 1000 metre;
 
 unit yard: length = ((1 mile) / 1760); 
 
-let y: length;
-let x: length = 1 mile; 
-let z: length = 2 * x;
-
-// This is a comment
-y = 0.33 / z;
-
-print(y);
-print(z*x/y in metre);
-print(z*x/(y in metre));
+// let y: length;
+// let x: length = 1 mile; 
+// let z: length = 2 * x;
+// 
+// THis is a comment
+// y = 0.33 / z;
+// 
+// print(y);
+// print(z*x/y in metre);
+// print(z*x/(y in metre));
