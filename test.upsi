@@ -11,3 +11,6 @@ let z: length = 2 * x;
 
 // This is a comment
 y = 0.33 / z;
+
+print(y);
+print(a, b, c, d, z*x/y);

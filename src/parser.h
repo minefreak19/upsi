@@ -23,7 +23,9 @@
  *
  * assignmentExpr = NAME "=" expr | geomExpr
  *
- * geomExpr = primaryExpr (("*" | "/") expr)?
+ * geomExpr = funcallExpr (("*" | "/") expr)?
+ *
+ * funcallExpr = NAME "(" [expr ","]? ")" | primaryExpr
  *
  * primaryExpr = "(" expr ")" | NUM NAME? | NAME
  */
@@ -37,6 +39,7 @@ typedef enum {
     EXPR_TYPE_PAREN,
     EXPR_TYPE_BINOP,
     EXPR_TYPE_ASSIGN,
+    EXPR_TYPE_FUNCALL,
 
     EXPR_TYPE__COUNT,
 } ExprType;
@@ -49,6 +52,12 @@ typedef enum {
 
     OP__COUNT,
 } Op;
+
+typedef struct Exprs {
+    struct Expr *items;
+    size_t count; 
+    size_t capacity; 
+} Exprs; 
 
 typedef struct Expr {
     ExprType type;
@@ -79,6 +88,12 @@ typedef struct Expr {
             StringView lhs;
             struct Expr *rhs;
         } assign;
+
+        struct {
+            StringView fun;
+
+            Exprs args;
+        } funcall;
     } as;
 } Expr;
 

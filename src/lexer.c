@@ -11,8 +11,11 @@
 
 #include "sv.h"
 
-static_assert(TOK_TYPE__COUNT == 15,
+static_assert(TOK_TYPE__COUNT == 16,
               "Exhaustive definition of TOK_NAMES wrt TokenType's");
+// ClangFormat keeps trying to put these into multiple columns, when I want
+// one per line
+// clang-format off
 static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
     [TOK_TYPE_KEYWORD_DIM]  = SV("dim"),
     [TOK_TYPE_KEYWORD_UNIT] = SV("unit"),
@@ -20,12 +23,14 @@ static const StringView TOK_NAMES[TOK_TYPE__COUNT] = {
 
     [TOK_TYPE_SEMICOLON] = SV(";"),
     [TOK_TYPE_COLON]     = SV(":"),
+    [TOK_TYPE_COMMA]     = SV(","),
     [TOK_TYPE_EQ]        = SV("="),
     [TOK_TYPE_STAR]      = SV("*"),
     [TOK_TYPE_SLASH]     = SV("/"),
     [TOK_TYPE_LPAREN]    = SV("("),
     [TOK_TYPE_RPAREN]    = SV(")"),
 };
+// clang-format on
 
 static inline bool tok_is_keyword(Token tok)
 {
@@ -183,7 +188,8 @@ Token lex_token(Lexer *self)
     lexer_trim_left(self);
 
     // Skip comment, if any
-    if (self->cur + 1 < self->text_len && self->text[self->cur] == '/' && self->text[self->cur + 1] == '/') {
+    if (self->cur + 1 < self->text_len && self->text[self->cur] == '/' &&
+        self->text[self->cur + 1] == '/') {
         while (self->text[self->cur] != '\n') {
             lexer_advance(self, 1);
         }
@@ -230,7 +236,7 @@ inline void loc_print(FILE *f, FileLoc loc)
 }
 
 static_assert(
-    TOK_TYPE__COUNT == 15,
+    TOK_TYPE__COUNT == 16,
     "Exhaustive definition of token_print with respect to TokenType's");
 void token_print(FILE *f, Token tok)
 {

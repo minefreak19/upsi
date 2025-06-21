@@ -3,13 +3,16 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#define NOB_STRIP_PREFIX
+#include "nob.h"
+
 #include "lexer.h"
 
 // TODO: Should Parser have a full list of tokens and a cursor, rather than
 // relying on the Lexer to continually supply tokens?
 
 static_assert(
-    TOK_TYPE__COUNT == 15,
+    TOK_TYPE__COUNT == 16,
     "Exhaustive definition of op_from_tok_type with respect to TokenType's");
 static_assert(OP__COUNT == 3,
               "Exhaustive definition of op_from_tok_type with respect to Op's");
@@ -88,9 +91,67 @@ static Expr parse_primary_expr(Parser *self)
     exit(1);
 }
 
+// TODO: Add some notion of tuples, which might make parsing function calls
+// easier by simply composing the two parsers
+static Expr parse_funcall_expr(Parser *self)
+{
+    // Similar trick as in parse_assignment_expr() which avoids needing to peek
+    // 2 tokens ahead
+
+    Expr primExpr = parse_primary_expr(self);
+    Token next    = peek_token(self->lexer);
+    if (primExpr.type != EXPR_TYPE_VAR || next.type != TOK_TYPE_LPAREN) {
+        return primExpr;
+    }
+    lex_token(&self->lexer);
+    next = peek_token(self->lexer);
+
+    if (next.type == TOK_TYPE_RPAREN) {
+        return (Expr) {
+            .type = EXPR_TYPE_FUNCALL,
+            .as.funcall =
+                {
+                    .fun  = primExpr.as.var.name,
+                    .args = {0},
+                },
+        };
+    }
+
+    // TODO: Don't leak memory for function call expressions
+    Exprs args = {0};
+    while (true) {
+        Expr arg = parse_expr(self);
+        da_append(&args, arg);
+
+        next = peek_token(self->lexer);
+        if (next.type == TOK_TYPE_COMMA) {
+            lex_token(&self->lexer);
+            next = peek_token(self->lexer);
+        } else if (next.type == TOK_TYPE_RPAREN) {
+            lex_token(&self->lexer);
+            break;
+        } else {
+            loc_print(stderr, next.loc);
+            fprintf(
+                stderr,
+                ": ERROR: Expected ',' or ')' after argument to function\n");
+            exit(1);
+        }
+    }
+
+    return (Expr) {
+        .type = EXPR_TYPE_FUNCALL,
+        .as.funcall =
+            {
+                .fun  = primExpr.as.var.name,
+                .args = args,
+            },
+    };
+}
+
 static Expr parse_geom_expr(Parser *self)
 {
-    Expr left = parse_primary_expr(self);
+    Expr left = parse_funcall_expr(self);
 
     Token next = peek_token(self->lexer);
     Op op      = op_from_tok_type(next.type);
@@ -292,7 +353,7 @@ void op_print(FILE *f, Op op)
 }
 
 static_assert(
-    EXPR_TYPE__COUNT == 6,
+    EXPR_TYPE__COUNT == 7,
     "Exhaustive definition of expr_print() with respect to ExprType's");
 void expr_print(FILE *f, Expr expr)
 {
@@ -335,6 +396,20 @@ void expr_print(FILE *f, Expr expr)
         fprintf(f, ", ");
         expr_print(f, *expr.as.assign.rhs);
         fprintf(f, ")");
+    } break;
+
+    case EXPR_TYPE_FUNCALL: {
+        fprintf(f, "Funcall(`" SV_FMT "`", SV_ARG(expr.as.funcall.fun));
+        if (expr.as.funcall.args.count > 0) {
+            fprintf(f, ", args = [");
+            expr_print(f, expr.as.funcall.args.items[0]);
+            for (size_t i = 1; i < expr.as.funcall.args.count; i++) {
+                fprintf(f, ", ");
+                expr_print(f, expr.as.funcall.args.items[i]);
+            }
+            fprintf(f, "]");
+        }
+        fputc(')', f);
     } break;
 
     default:
