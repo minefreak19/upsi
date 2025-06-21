@@ -13,4 +13,5 @@ let z: length = 2 * x;
 y = 0.33 / z;
 
 print(y);
-print(a, b, c, d, z*x/y);
+print(z*x/y in metre);
+print(z*x/(y in metre));

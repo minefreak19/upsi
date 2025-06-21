@@ -4,15 +4,14 @@
 #include <stdlib.h>
 
 #define NOB_STRIP_PREFIX
-#include "nob.h"
-
 #include "lexer.h"
+#include "nob.h"
 
 // TODO: Should Parser have a full list of tokens and a cursor, rather than
 // relying on the Lexer to continually supply tokens?
 
 static_assert(
-    TOK_TYPE__COUNT == 16,
+    TOK_TYPE__COUNT == 17,
     "Exhaustive definition of op_from_tok_type with respect to TokenType's");
 static_assert(OP__COUNT == 3,
               "Exhaustive definition of op_from_tok_type with respect to Op's");
@@ -160,7 +159,7 @@ static Expr parse_geom_expr(Parser *self)
     }
 
     lex_token(&self->lexer);
-    Expr right = parse_expr(self);
+    Expr right = parse_geom_expr(self);
 
     return (Expr) {
         .type = EXPR_TYPE_BINOP,
@@ -173,13 +172,36 @@ static Expr parse_geom_expr(Parser *self)
     };
 }
 
+static Expr parse_unit_cast_expr(Parser *self)
+{
+    Expr value = parse_geom_expr(self);
+
+    Token next = peek_token(self->lexer);
+    if (next.type != TOK_TYPE_KEYWORD_IN) {
+        return value;
+    }
+    lex_token(&self->lexer);
+
+    Token unit = lex_token(&self->lexer);
+    ensure_tok_type(unit, TOK_TYPE_NAME, "a unit name after `in`");
+
+    return (Expr) {
+        .type = EXPR_TYPE_UNITCAST,
+        .as.unit_cast =
+            {
+                .value  = parser_save_expr(self, value),
+                .target = unit.name,
+            },
+    };
+}
+
 static Expr parse_assignment_expr(Parser *self)
 {
     // The implementation here deviates from the grammar slightly so as to not
     // rely on peeking more than 1 token ahead (which would be required to check
     // for both a variable name and an `=`).
 
-    Expr lhs = parse_geom_expr(self);
+    Expr lhs = parse_unit_cast_expr(self);
 
     Token next = peek_token(self->lexer);
     if (lhs.type == EXPR_TYPE_VAR && next.type == TOK_TYPE_EQ) {
@@ -353,7 +375,7 @@ void op_print(FILE *f, Op op)
 }
 
 static_assert(
-    EXPR_TYPE__COUNT == 7,
+    EXPR_TYPE__COUNT == 8,
     "Exhaustive definition of expr_print() with respect to ExprType's");
 void expr_print(FILE *f, Expr expr)
 {
@@ -409,6 +431,12 @@ void expr_print(FILE *f, Expr expr)
             }
             fprintf(f, "]");
         }
+        fputc(')', f);
+    } break;
+
+    case EXPR_TYPE_UNITCAST: {
+        fprintf(f, "UnitCast(`" SV_FMT "`, ", SV_ARG(expr.as.unit_cast.target));
+        expr_print(f, *expr.as.unit_cast.value);
         fputc(')', f);
     } break;
 

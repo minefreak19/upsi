@@ -21,9 +21,11 @@
  *
  * expr = assignmentExpr
  *
- * assignmentExpr = NAME "=" expr | geomExpr
+ * assignmentExpr = NAME "=" expr | unitCastExpr
  *
- * geomExpr = funcallExpr (("*" | "/") expr)?
+ * unitCastExpr = geomExpr ("in" NAME)?
+ *
+ * geomExpr = funcallExpr (("*" | "/") geomExpr)?
  *
  * funcallExpr = NAME "(" [expr ","]? ")" | primaryExpr
  *
@@ -40,6 +42,10 @@ typedef enum {
     EXPR_TYPE_BINOP,
     EXPR_TYPE_ASSIGN,
     EXPR_TYPE_FUNCALL,
+    // TODO: Work out whether this should only be a part of `print` semantics,
+    // since we intend variables of the same dimension to be automatically
+    // assigned to each other without explicit casting.
+    EXPR_TYPE_UNITCAST,
 
     EXPR_TYPE__COUNT,
 } ExprType;
@@ -55,9 +61,9 @@ typedef enum {
 
 typedef struct Exprs {
     struct Expr *items;
-    size_t count; 
-    size_t capacity; 
-} Exprs; 
+    size_t count;
+    size_t capacity;
+} Exprs;
 
 typedef struct Expr {
     ExprType type;
@@ -94,6 +100,11 @@ typedef struct Expr {
 
             Exprs args;
         } funcall;
+
+        struct {
+            struct Expr *value; 
+            StringView target;
+        } unit_cast;
     } as;
 } Expr;
 
