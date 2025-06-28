@@ -102,7 +102,7 @@ typedef struct Expr {
         } funcall;
 
         struct {
-            struct Expr *value; 
+            struct Expr *value;
             StringView target;
         } unit_cast;
     } as;
@@ -146,6 +146,8 @@ typedef struct {
     } as;
 } Stmt;
 
+void op_print(FILE *f, Op op);
+void expr_print(FILE *f, Expr expr);
 void stmt_print(FILE *f, Stmt stmt);
 
 #define PARSER_EXPRS_CAP 256

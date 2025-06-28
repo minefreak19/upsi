@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "eval.h"
 #include "lexer.h"
 #include "parser.h"
 
@@ -12,6 +13,7 @@
 static struct {
     const char *program_name;
     const char *source_file;
+    bool debug;
 } args;
 
 char *slurp_file_to_cstr(const char *path)
@@ -72,6 +74,12 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    for (char *arg = *argv++; arg; arg = *argv++) {
+        if (strcmp(arg, "--debug") == 0) {
+            args.debug = true;
+        }
+    }
+
     const char *text = slurp_file_to_cstr(args.source_file);
 
     Lexer lexer    = lexer_from_cstr(text);
@@ -81,13 +89,17 @@ int main(int argc, char **argv)
         .lexer = lexer,
     };
 
+    EvalContext ctx = new_context();
+
+    if (args.debug) dump_context(stdout, &ctx);
     for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
          stmt      = parse_stmt(&parser)) {
-        stmt_print(stdout, stmt);
-        fputc('\n', stdout);
+        eval_stmt(&ctx, stmt);
+        if (args.debug) dump_context(stdout, &ctx);
     }
 
-    // TODO: It will probably be necessary to specify a fundamental unit for each dimension at time of dimension declaration
+    // TODO: It will probably be necessary to specify a fundamental unit for
+    // each dimension at time of dimension declaration
 
     free((void *) text);
     return 0;
