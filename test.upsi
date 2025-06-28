@@ -2,6 +2,8 @@ dim length;
 unit metre: length;  
 dim time; 
 unit second: time;
+unit minute: time = 60 second; 
+unit hour: time = 60 minute;
 
 unit mile: length = 1.609344 * 1000 metre;
 
@@ -16,6 +18,11 @@ y = z / 0.33;
 
 print(y);
 print(y in metre);
+print((1 yard) in mile);
+print(1 mile in yard);
+print(y in yard);
+print(1 hour in second);
+print(1 second in hour);
 
 // print(z*x/y in metre);
 // print(z*x/(y in metre));

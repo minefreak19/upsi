@@ -262,7 +262,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     case EXPR_TYPE_NUM: {
         double num     = expr.as.num.val;
         UnitIndex unit = (sv_is_empty(expr.as.num.unit))
-                             ? 0
+                             ? UNITLESS
                              : resolve_unit_by_name(ctx, expr.as.num.unit);
 
         return (Value) {
@@ -360,14 +360,17 @@ Value eval_expr(EvalContext *ctx, Expr expr)
                     exit(1);
                 }
 
-                fun_to_target = value_binop(
-                    fun_to_target,
-                    eval_expr(ctx, ctx->units.items[fun_to_target.unit].expr),
-                    OP_MULT);
+                Value next =
+                    eval_expr(ctx, ctx->units.items[fun_to_target.unit].expr);
+
+                fun_to_target = (Value) {
+                    .num  = fun_to_target.num * next.num,
+                    .unit = next.unit,
+                };
             }
             assert(fun_to_target.unit == dim.fundamental_unit);
 
-            conv_factor *= fun_to_target.num;
+            conv_factor /= fun_to_target.num;
         }
 
         if (source.expr.type != EXPR_TYPE_NONE) {
@@ -382,10 +385,13 @@ Value eval_expr(EvalContext *ctx, Expr expr)
                     exit(1);
                 }
 
-                source_to_fun = value_binop(
-                    source_to_fun,
-                    eval_expr(ctx, ctx->units.items[source_to_fun.unit].expr),
-                    OP_MULT);
+                Value next =
+                    eval_expr(ctx, ctx->units.items[source_to_fun.unit].expr);
+
+                source_to_fun = (Value) {
+                    .num  = source_to_fun.num * next.num,
+                    .unit = next.unit,
+                };
             }
             assert(source_to_fun.unit == dim.fundamental_unit);
 
