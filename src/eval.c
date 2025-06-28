@@ -398,6 +398,10 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         };
     }
 
+    case EXPR_TYPE_PAREN: {
+        return eval_expr(ctx, *expr.as.paren.inner);
+    }
+
     default:
         fprintf(stderr, "ERROR: Don't know how to evaluate expression: ");
         expr_print(stderr, expr);
