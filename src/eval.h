@@ -3,15 +3,15 @@
 
 #include "parser.h"
 
-typedef size_t UnitIndex, DimIndex, VarIndex;
+typedef size_t SimpleUnitIndex, DimIndex, VarIndex;
 
 /// Dimensionless and Unitless are always first in the evaluation context
 #define DIMLESS ((DimIndex) 0)
-#define UNITLESS ((UnitIndex) 0)
+#define UNITLESS ((SimpleUnitIndex) 0)
 
 typedef struct {
     StringView name;
-    UnitIndex fundamental_unit;
+    SimpleUnitIndex fundamental_unit;
 } Dim;
 
 typedef struct {
@@ -19,16 +19,13 @@ typedef struct {
     DimIndex dim;
 
     // This should have type EXPR_TYPE_NONE for a fundamental unit, and should
-    // otherwise be a mathematical expression in terms of a different unit. The
-    // evaluator should error if the units don't match, and a check should be
-    // put in place so that it doesn't end up going in circles in the event of a
-    // cyclic definition of units
+    // otherwise be a mathematical expression in terms of a different unit. 
     Expr expr;
-} Unit;
+} SimpleUnit;
 
 typedef struct {
     double num;
-    UnitIndex unit;
+    SimpleUnitIndex unit;
 } Value;
 
 typedef struct {
@@ -54,10 +51,10 @@ typedef struct {
 
     /// units.items[0] is special and always refers to the "unitless" unit
     struct {
-        Unit *items;
+        SimpleUnit *items;
         size_t count;
         size_t capacity;
-    } units;
+    } simple_units;
 
     struct {
         Var *items;

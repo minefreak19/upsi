@@ -18,7 +18,7 @@
 
 // TODO: Implement better pretty printing for some of these values
 // (e.g. print the name of the dimension/unit instead of just the index)
-static void unit_dump(FILE *f, Unit u)
+static void unit_dump(FILE *f, SimpleUnit u)
 {
     fprintf(f, "`" SV_FMT "` ", SV_ARG(u.name));
     if (u.expr.type != EXPR_TYPE_NONE) {
@@ -50,13 +50,13 @@ static void var_dump(FILE *f, Var v)
 void dump_context(FILE *f, EvalContext *ctx)
 {
     fprintf(f, "EvalContext {\n");
-    if (ctx->units.count > 0) {
+    if (ctx->simple_units.count > 0) {
         fprintf(f, "\tunits: [");
         // TODO: Print index as well
-        unit_dump(f, ctx->units.items[0]);
-        for (size_t i = 1; i < ctx->units.count; i++) {
+        unit_dump(f, ctx->simple_units.items[0]);
+        for (size_t i = 1; i < ctx->simple_units.count; i++) {
             fprintf(f, ", ");
-            unit_dump(f, ctx->units.items[i]);
+            unit_dump(f, ctx->simple_units.items[i]);
         }
         fprintf(f, "],\n");
     }
@@ -91,22 +91,22 @@ EvalContext new_context(void)
     };
     da_append(&ctx.dims, dimensionless);
 
-    Unit unitless = {
+    SimpleUnit unitless = {
         .name = SV("(unitless)"),
         .dim  = 0,
         .expr = {0},
     };
-    da_append(&ctx.units, unitless);
+    da_append(&ctx.simple_units, unitless);
 
     return ctx;
 }
 
 void free_context(EvalContext *ctx)
 {
-    for (size_t i = 0; i < ctx->units.count; i++) {
-        expr_free(ctx->units.items[i].expr);
+    for (size_t i = 0; i < ctx->simple_units.count; i++) {
+        expr_free(ctx->simple_units.items[i].expr);
     }
-    free(ctx->units.items);
+    free(ctx->simple_units.items);
     // Nothing to do for dimensions or variables
     // TODO: This will change once compound dimensions are added
     free(ctx->dims.items);
@@ -139,11 +139,11 @@ static bool try_resolve_dim_by_name(EvalContext *ctx, StringView name,
 /// resp == NULL, simply returns whether the unit exists. If the unit
 /// does not exist, returns false and does not modify `*resp`
 static bool try_resolve_unit_by_name(EvalContext *ctx, StringView name,
-                                     UnitIndex *resp)
+                                     SimpleUnitIndex *resp)
 {
-    UnitIndex idx;
-    for (idx = 0; idx < ctx->units.count; idx++) {
-        if (sv_eq(name, ctx->units.items[idx].name)) {
+    SimpleUnitIndex idx;
+    for (idx = 0; idx < ctx->simple_units.count; idx++) {
+        if (sv_eq(name, ctx->simple_units.items[idx].name)) {
             if (resp != NULL) {
                 *resp = idx;
             }
@@ -187,9 +187,9 @@ static DimIndex resolve_dim_by_name(EvalContext *ctx, StringView name)
     return res;
 }
 
-static UnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
+static SimpleUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
 {
-    UnitIndex res;
+    SimpleUnitIndex res;
     if (!try_resolve_unit_by_name(ctx, name, &res)) {
         fprintf(stderr, "ERROR: Could not resolve unit `" SV_FMT "`.\n",
                 SV_ARG(name));
@@ -258,7 +258,7 @@ Value val_print(EvalContext *ctx, Value value)
     int printed = printf("%f", value.num);
     if (value.unit != 0) {
         printed +=
-            printf(" " SV_FMT, SV_ARG(ctx->units.items[value.unit].name));
+            printf(" " SV_FMT, SV_ARG(ctx->simple_units.items[value.unit].name));
     }
     printed += printf("\n");
     return (Value) {
@@ -272,7 +272,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     switch (expr.type) {
     case EXPR_TYPE_NUM: {
         double num     = expr.as.num.val;
-        UnitIndex unit = (sv_is_empty(expr.as.num.unit))
+        SimpleUnitIndex unit = (sv_is_empty(expr.as.num.unit))
                              ? UNITLESS
                              : resolve_unit_by_name(ctx, expr.as.num.unit);
 
@@ -307,7 +307,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         Value rhs    = eval_expr(ctx, *expr.as.assign.rhs);
 
         DimIndex lhs_dim = ctx->vars.items[idx].dim;
-        DimIndex rhs_dim = ctx->units.items[rhs.unit].dim;
+        DimIndex rhs_dim = ctx->simple_units.items[rhs.unit].dim;
         if (lhs_dim != rhs_dim) {
             fprintf(stderr,
                     "ERROR: Cannot assign to var `" SV_FMT
@@ -346,12 +346,12 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     }
 
     case EXPR_TYPE_UNITCAST: {
-        UnitIndex target_id =
+        SimpleUnitIndex target_id =
             resolve_unit_by_name(ctx, expr.as.unit_cast.target);
-        Unit target = ctx->units.items[target_id];
+        SimpleUnit target = ctx->simple_units.items[target_id];
 
         Value val   = eval_expr(ctx, *expr.as.unit_cast.value);
-        Unit source = ctx->units.items[val.unit];
+        SimpleUnit source = ctx->simple_units.items[val.unit];
         if (source.dim != target.dim) {
             fprintf(stderr,
                     "ERROR: Cannot cast a value of dimension `" SV_FMT
@@ -380,7 +380,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
                 }
 
                 Value next =
-                    eval_expr(ctx, ctx->units.items[fun_to_target.unit].expr);
+                    eval_expr(ctx, ctx->simple_units.items[fun_to_target.unit].expr);
 
                 fun_to_target = (Value) {
                     .num  = fun_to_target.num * next.num,
@@ -405,7 +405,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
                 }
 
                 Value next =
-                    eval_expr(ctx, ctx->units.items[source_to_fun.unit].expr);
+                    eval_expr(ctx, ctx->simple_units.items[source_to_fun.unit].expr);
 
                 source_to_fun = (Value) {
                     .num  = source_to_fun.num * next.num,
@@ -464,7 +464,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     case STMT_TYPE_UNIT_DECL: {
         DimIndex dim = resolve_dim_by_name(ctx, stmt.as.unit_decl.dim);
 
-        Unit unit = {
+        SimpleUnit unit = {
             .name = stmt.as.unit_decl.name,
             .dim  = dim,
             // TODO: Renamet his quantity to `as.unit_decl.expr` as well for
@@ -491,15 +491,15 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                     "`. The unit `" SV_FMT
                     "` must be expressed in terms of the fundamental unit.\n",
                     SV_ARG(dim->name),
-                    SV_ARG(ctx->units.items[dim->fundamental_unit].name),
+                    SV_ARG(ctx->simple_units.items[dim->fundamental_unit].name),
                     SV_ARG(unit.name));
                 exit(1);
             }
 
-            dim->fundamental_unit = ctx->units.count;
+            dim->fundamental_unit = ctx->simple_units.count;
         }
 
-        da_append(&ctx->units, unit);
+        da_append(&ctx->simple_units, unit);
 
         return;
     }
