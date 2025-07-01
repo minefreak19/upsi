@@ -1,4 +1,3 @@
-# TODO: Can this be moved to C99?
 CFLAGS:=-Wall -Wextra -Wpedantic -std=c11 -glldb
 
 SOURCE_FILES:=$(wildcard src/*.c)
