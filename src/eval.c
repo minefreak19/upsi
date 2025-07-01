@@ -103,6 +103,14 @@ EvalContext new_context(void)
     return ctx;
 }
 
+void free_context(EvalContext *ctx)
+{
+    free(ctx->units.items);
+    free(ctx->dims.items);
+    free(ctx->vars.items);
+    *ctx = (EvalContext) {0};
+}
+
 /// If a dimension with name `name` exists in `ctx`, returns true and sets
 /// `*resp` (if resp != NULL) to the index of the corresponding dimension. If
 /// resp == NULL, simply returns whether the dimension exists. If the dimension

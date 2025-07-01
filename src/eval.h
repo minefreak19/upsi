@@ -44,8 +44,8 @@ typedef struct {
 typedef struct {
     // TODO: Turn this into a stack of scopes
 
-    // TODO: Don't leak this memory
-    /// dims.items[0] is special and always refers to the "dimensionless" dimension
+    /// dims.items[0] is special and always refers to the "dimensionless"
+    /// dimension
     struct {
         Dim *items;
         size_t count;
@@ -67,6 +67,7 @@ typedef struct {
 } EvalContext;
 
 EvalContext new_context(void);
+void free_context(EvalContext *ctx);
 void eval_stmt(EvalContext *ctx, Stmt stmt);
 void dump_context(FILE *f, EvalContext *ctx);
 

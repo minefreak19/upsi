@@ -97,6 +97,8 @@ int main(int argc, char **argv)
         eval_stmt(&ctx, stmt);
         if (args.debug) dump_context(stdout, &ctx);
     }
+    
+    free_context(&ctx);
 
     free((void *) text);
     return 0;
