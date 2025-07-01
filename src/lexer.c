@@ -43,11 +43,10 @@ static inline bool tok_is_symb(Token tok)
     return TOK_TYPE__SYMB_START <= tok.type && tok.type < TOK_TYPE__SYMB_END;
 }
 
+/// Returns true if the character passed in can be the first character of a
+/// symbol (i.e. this character can mark the end of a word)
 static bool is_symb(char c)
 {
-    // TODO: For any potential multi-character symbols, should this function
-    // return true for all characters or only the first character of each
-    // symbol?
     for (int i = TOK_TYPE__SYMB_START; i < TOK_TYPE__SYMB_END; i++) {
         if (c == TOK_NAMES[i].text[0]) return true;
     }
@@ -99,8 +98,6 @@ static bool try_lex_word(Lexer *self, StringView *resp)
     if (self->cur >= self->text_len) {
         return false;
     }
-    // TODO: Optimise this. I'm sure this isn't the cleanest or more efficient
-    // way to collect a word
     StringView res = {
         .text = &self->text[self->cur],
         .len  = 0,
@@ -148,10 +145,10 @@ static Token lex_number(Lexer *self)
     if (self->cur < self->text_len && self->text[self->cur] == '.') {
         if (self->cur + 1 >= self->text_len ||
             !isdigit(self->text[self->cur + 1])) {
-            // TODO: Add a proper error reporting mechanism
+            loc_print(stderr, self->loc);
             fprintf(
                 stderr,
-                "ERROR: Could not lex number - trailing `.' without further "
+                ": ERROR: Could not lex number - trailing `.' without further "
                 "digits\n");
             exit(1);
         }
@@ -181,9 +178,6 @@ static Token lex_number(Lexer *self)
     }
 }
 
-// TODO: This currently assumes the input is a sequence of completely valid
-// tokens. This might not be a valid assumption - or maybe errors are something
-// we want to deal with in the parser. Time will tell.
 Token lex_token(Lexer *self)
 {
     lexer_trim_left(self);
