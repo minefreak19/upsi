@@ -16,6 +16,7 @@ static struct {
     bool debug;
 } args;
 
+/// Expects caller to `free()` the returned cstr
 char *slurp_file_to_cstr(const char *path)
 {
     FILE *f = fopen(path, "r");
@@ -35,8 +36,7 @@ char *slurp_file_to_cstr(const char *path)
                 strerror(errno));
         exit(1);
     }
-    // TODO: Maybe put this in an Arena so we don't leak memory here, even
-    // though for now this function is only called once
+
     char *res = malloc(len + 1);  // null byte
     if (fseek(f, 0, SEEK_SET) < 0) {
         fprintf(stderr, "ERROR: Could not seek in file %s: %s\n", path,
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
     (void) argc;
     args.program_name = *argv++;
     assert(args.program_name &&
-           "TODO: This program is expected to only be called from the command "
+           "This program is expected to only be called from the command "
            "line");
 
     args.source_file = *argv++;
@@ -97,9 +97,6 @@ int main(int argc, char **argv)
         eval_stmt(&ctx, stmt);
         if (args.debug) dump_context(stdout, &ctx);
     }
-
-    // TODO: It will probably be necessary to specify a fundamental unit for
-    // each dimension at time of dimension declaration
 
     free((void *) text);
     return 0;
