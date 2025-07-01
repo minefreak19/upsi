@@ -86,15 +86,13 @@ void dump_context(FILE *f, EvalContext *ctx)
 EvalContext new_context(void)
 {
     EvalContext ctx = {0};
-    // TODO: Disallow the user (on the lexer/parser level) to name identifiers
-    // with these "special" names
     Dim dimensionless = {
-        .name = SV("<dimensionless>"),
+        .name = SV("(dimensionless)"),
     };
     da_append(&ctx.dims, dimensionless);
 
     Unit unitless = {
-        .name = SV("<unitless>"),
+        .name = SV("(unitless)"),
         .dim  = 0,
         .expr = {0},
     };
