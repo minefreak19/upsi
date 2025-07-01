@@ -19,9 +19,27 @@ typedef struct {
     DimIndex dim;
 
     // This should have type EXPR_TYPE_NONE for a fundamental unit, and should
-    // otherwise be a mathematical expression in terms of a different unit. 
+    // otherwise be a mathematical expression in terms of a different unit.
     Expr expr;
 } SimpleUnit;
+
+/// Shouldn't be used directly; encodes a simple unit raised to a particular
+/// power, as will be needed for variables with arbitrarily complex units
+typedef struct {
+    SimpleUnitIndex unit;
+    int32_t power;
+} SimpleUnitPow;
+
+/// Maximum number of distinct SimpleUnits that can be composed in a compound
+/// unit
+#define COMPOUND_UNIT_CAP 128
+
+// TODO: The current implementation of compound units is memory intensive when
+// many values have the same compound unit. Can this be improved?
+typedef struct {
+    SimpleUnitPow elems[COMPOUND_UNIT_CAP];
+    size_t elems_count;
+} CompoundUnit;
 
 typedef struct {
     double num;
