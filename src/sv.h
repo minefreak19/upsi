@@ -12,8 +12,6 @@ typedef struct {
 #define SV(cstr) ((StringView) {.text = (cstr), .len = sizeof(cstr) - 1})
 
 #define SV_FMT "%.*s"
-// TODO: Is there a more proper way to appease the compiler without having to
-// cast to int?
 #define SV_ARG(sv) ((int) (sv).len), ((sv).text)
 
 StringView sv_from_cstr(const char *cstr);
@@ -38,7 +36,6 @@ bool sv_eq(StringView a, StringView b)
     return a.len == b.len && strncmp(a.text, b.text, a.len) == 0;
 }
 
-// TODO: Should this also consider NULL-pointers as empty?
 bool sv_is_empty(StringView sv) {
     return sv.len == 0;
 }
