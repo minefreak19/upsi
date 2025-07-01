@@ -106,6 +106,7 @@ static Expr parse_funcall_expr(Parser *self)
     next = peek_token(self->lexer);
 
     if (next.type == TOK_TYPE_RPAREN) {
+        lex_token(&self->lexer);
         return (Expr) {
             .type = EXPR_TYPE_FUNCALL,
             .as.funcall =
