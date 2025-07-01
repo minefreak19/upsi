@@ -7,9 +7,6 @@
 #include "lexer.h"
 #include "nob.h"
 
-// TODO: Should Parser have a full list of tokens and a cursor, rather than
-// relying on the Lexer to continually supply tokens?
-
 static_assert(
     TOK_TYPE__COUNT == 17,
     "Exhaustive definition of op_from_tok_type with respect to TokenType's");
@@ -90,8 +87,7 @@ static Expr parse_primary_expr(Parser *self)
     exit(1);
 }
 
-// TODO: Add some notion of tuples, which might make parsing function calls
-// easier by simply composing the two parsers
+// TODO: Add tuples
 static Expr parse_funcall_expr(Parser *self)
 {
     // Similar trick as in parse_assignment_expr() which avoids needing to peek
