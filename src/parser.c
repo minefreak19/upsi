@@ -37,12 +37,16 @@ static void ensure_tok_type(Token tok, TokenType type, const char *expected_str)
 
 static Expr *parser_save_expr(Parser *self, Expr expr)
 {
-    if (self->exprs_count >= PARSER_EXPRS_CAP) {
-        assert(0 && "Tried to allocate too many expressions!");
-    }
+    // TODO: Add an optional Arena to Parser for allocating expressions
+    (void) self;
 
-    self->exprs[self->exprs_count++] = expr;
-    return &self->exprs[self->exprs_count - 1];
+    Expr *exprp = malloc(sizeof(Expr));
+    if (!exprp) {
+        fprintf(stderr, "ERROR: Not enough memory.\n");
+        abort();
+    }
+    *exprp = expr;
+    return exprp;
 }
 
 // TODO: These functions can probably accept the next token if it's already
@@ -112,7 +116,6 @@ static Expr parse_funcall_expr(Parser *self)
         };
     }
 
-    // TODO: Don't leak memory for function call expressions
     Exprs args = {0};
     while (true) {
         Expr arg = parse_expr(self);
@@ -485,3 +488,45 @@ void stmt_print(FILE *f, Stmt stmt)
         assert(0 && "Unreachable");
     }
 }
+
+void expr_free(Expr expr)
+{
+    switch (expr.type) {
+    case EXPR_TYPE_PAREN:
+        expr_free(*expr.as.paren.inner);
+        free(expr.as.paren.inner);
+        return;
+
+    case EXPR_TYPE_BINOP:
+        expr_free(*expr.as.binop.left);
+        expr_free(*expr.as.binop.right);
+        free(expr.as.binop.left);
+        free(expr.as.binop.right);
+        return;
+
+    case EXPR_TYPE_ASSIGN:
+        expr_free(*expr.as.assign.rhs);
+        free(expr.as.assign.rhs);
+        return;
+
+    case EXPR_TYPE_FUNCALL: {
+        Exprs args = expr.as.funcall.args;
+        for (size_t i = 0; i < args.count; i++) {
+            expr_free(args.items[i]);
+        }
+        free(args.items);
+        return;
+    }
+
+    case EXPR_TYPE_UNITCAST:
+        expr_free(*expr.as.unit_cast.value);
+        free(expr.as.unit_cast.value);
+
+    case EXPR_TYPE_NONE:
+    case EXPR_TYPE_NUM:
+    case EXPR_TYPE_VAR:
+    case EXPR_TYPE__COUNT:
+        return;
+    }
+}
+

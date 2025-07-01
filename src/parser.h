@@ -148,17 +148,11 @@ typedef struct {
 
 void op_print(FILE *f, Op op);
 void expr_print(FILE *f, Expr expr);
+void expr_free(Expr expr);
 void stmt_print(FILE *f, Stmt stmt);
-
-#define PARSER_EXPRS_CAP 256
 
 typedef struct {
     Lexer lexer;
-
-    /// Buffer of expressions that outputted Exprs might have pointers to
-    // TODO: Is there a better way to implement this?
-    Expr exprs[PARSER_EXPRS_CAP];
-    size_t exprs_count;
 } Parser;
 
 Expr parse_expr(Parser *self);

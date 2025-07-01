@@ -105,7 +105,12 @@ EvalContext new_context(void)
 
 void free_context(EvalContext *ctx)
 {
+    for (size_t i = 0; i < ctx->units.count; i++) {
+        expr_free(ctx->units.items[i].expr);
+    }
     free(ctx->units.items);
+    // Nothing to do for dimensions or variables
+    // TODO: This will change once compound dimensions are added
     free(ctx->dims.items);
     free(ctx->vars.items);
     *ctx = (EvalContext) {0};
