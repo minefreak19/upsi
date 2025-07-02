@@ -1,6 +1,8 @@
 #ifndef EVAL_H_
 #define EVAL_H_
 
+#include <inttypes.h>
+
 #include "parser.h"
 
 typedef size_t SimpleUnitIndex, DimIndex, VarIndex;
@@ -23,11 +25,14 @@ typedef struct {
     Expr expr;
 } SimpleUnit;
 
+typedef int32_t Power;
+#define POWER_FMT PRIi32
+
 /// Shouldn't be used directly; encodes a simple unit raised to a particular
 /// power, as will be needed for variables with arbitrarily complex units
 typedef struct {
     SimpleUnitIndex unit;
-    int32_t power;
+    Power power;
 } SimpleUnitPow;
 
 /// Maximum number of distinct SimpleUnits that can be composed in a compound
@@ -43,7 +48,7 @@ typedef struct {
 
 typedef struct {
     double num;
-    SimpleUnitIndex unit;
+    CompoundUnit unit;
 } Value;
 
 typedef struct {

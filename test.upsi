@@ -10,20 +10,27 @@ unit mile: length = 1.609344 * 1000 metre;
 unit yard: length = ((1 mile) / 1760); 
 
 let y: length;
-let x: length = 1 mile; 
+let x: length = 3 mile; 
 let z: length = 2 * x;
 
 // This is a comment
-y = z / 0.33;
-
+// y = 1 / x; // causes dimension mismatch
+print(z / x*x);
 print(y);
-print(y in metre);
-print((1 yard) in mile);
-print(1 mile in yard);
-print(y in yard);
-print(1 hour in second);
-print(1 second in hour);
+
+// print(x);
+// print(x in metre);
+// print((1 yard) in mile);
+// print(1 mile in yard);
+// print(x in yard);
+// print(1 hour in second);
+// print(1 second in hour);
 // print();
+
+// x = x in metre;
+// print((x in metre)*x);
+// print((x)*x);
+// print(x / x);
 
 // print(z*x/y in metre);
 // print(z*x/(y in metre));
