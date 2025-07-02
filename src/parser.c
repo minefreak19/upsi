@@ -279,13 +279,6 @@ static Stmt parse_var_decl(Parser *self)
     Token name = lex_token(&self->lexer);
     ensure_tok_type(name, TOK_TYPE_NAME, "variable name");
 
-    Token colon = lex_token(&self->lexer);
-    ensure_tok_type(colon, TOK_TYPE_COLON,
-                    "`:` followed by dimension of variable");
-
-    Token dim = lex_token(&self->lexer);
-    ensure_tok_type(dim, TOK_TYPE_NAME, "name of dimension of variable");
-
     Token next = lex_token(&self->lexer);
     Expr value = {0};
     if (next.type == TOK_TYPE_EQ) {
@@ -300,7 +293,6 @@ static Stmt parse_var_decl(Parser *self)
         .type = STMT_TYPE_VAR_DECL,
         .as.var_decl =
             {
-                .dim   = dim.name,
                 .name  = name.name,
                 .value = value,
             },
@@ -470,8 +462,8 @@ void stmt_print(FILE *f, Stmt stmt)
     } break;
 
     case STMT_TYPE_VAR_DECL: {
-        fprintf(f, "VarDecl(name = `" SV_FMT "`, dim = `" SV_FMT "`",
-                SV_ARG(stmt.as.var_decl.name), SV_ARG(stmt.as.var_decl.dim));
+        fprintf(f, "VarDecl(name = `" SV_FMT "`",
+                SV_ARG(stmt.as.var_decl.name));
         if (stmt.as.var_decl.value.type != EXPR_TYPE_NONE) {
             fprintf(f, ", value = ");
             expr_print(f, stmt.as.var_decl.value);

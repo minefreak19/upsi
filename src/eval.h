@@ -54,8 +54,6 @@ typedef struct {
 typedef struct {
     StringView name;
 
-    // TODO: Do we need to keep track of this?
-    DimIndex dim;
     // TODO: Can this flag be NaN-boxed into `value`?
     bool initialised;
     Value value;

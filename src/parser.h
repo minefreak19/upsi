@@ -17,7 +17,7 @@
  *
  * unitDecl = "unit" NAME ":" NAME ("=" expr)? ";"
  *
- * varDecl = "let" NAME ":" NAME ("=" expr)? ";"
+ * varDecl = "let" NAME ("=" expr)? ";"
  *
  * expr = assignmentExpr
  *
@@ -136,7 +136,6 @@ typedef struct {
 
         // TODO: Does this mean that variables and units are equivalent?
         struct {
-            StringView dim;
             StringView name;
 
             Expr value;

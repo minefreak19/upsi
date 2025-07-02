@@ -48,7 +48,7 @@ static void val_dump(FILE *f, Value v)
 
 static void var_dump(FILE *f, Var v)
 {
-    fprintf(f, "`" SV_FMT "` (%zu)", SV_ARG(v.name), v.dim);
+    fprintf(f, "`" SV_FMT "`", SV_ARG(v.name));
     if (v.initialised) {
         fprintf(f, " = ");
         val_dump(f, v.value);
@@ -383,33 +383,15 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         VarIndex idx = resolve_var_by_name(ctx, expr.as.assign.lhs);
         Value rhs    = eval_expr(ctx, *expr.as.assign.rhs);
 
-        // TODO: Remove dimension information from variables (it can be re-added
-        // later in a way that works better with the new system)
-        if (rhs.unit.elems_count == 1 && rhs.unit.elems[0].power == 1) {
-            DimIndex lhs_dim = ctx->vars.items[idx].dim;
-            DimIndex rhs_dim =
-                ctx->simple_units.items[rhs.unit.elems[0].unit].dim;
-            if (lhs_dim != rhs_dim) {
-                fprintf(stderr,
-                        "ERROR: Cannot assign to var `" SV_FMT
-                        "`: LHS dim (`" SV_FMT "`) != RHS dim (`" SV_FMT
-                        "`).\n",
-                        SV_ARG(expr.as.assign.lhs),
-                        SV_ARG(ctx->dims.items[lhs_dim].name),
-                        SV_ARG(ctx->dims.items[rhs_dim].name));
-                exit(1);
-            }
-        } else {
-            // TODO: Better error message here once compound dimensions are
-            // figured out
-            if (!compound_unit_is_castable(ctx, ctx->vars.items[idx].value.unit,
-                                           rhs.unit)) {
-                fprintf(stderr,
-                        "ERROR: Cannot assign to var `" SV_FMT
-                        "`: Dimensionality mismatch.\n",
-                        SV_ARG(expr.as.assign.lhs));
-                exit(1);
-            }
+        // TODO: Better error message here once compound dimensions are
+        // figured out
+        if (!compound_unit_is_castable(ctx, ctx->vars.items[idx].value.unit,
+                                       rhs.unit)) {
+            fprintf(stderr,
+                    "ERROR: Cannot assign to var `" SV_FMT
+                    "`: Dimensionality mismatch.\n",
+                    SV_ARG(expr.as.assign.lhs));
+            exit(1);
         }
 
         ctx->vars.items[idx].value = rhs;
@@ -656,11 +638,8 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     }
 
     case STMT_TYPE_VAR_DECL: {
-        DimIndex dim = resolve_dim_by_name(ctx, stmt.as.var_decl.dim);
-
         Var var = {
             .name = stmt.as.var_decl.name,
-            .dim  = dim,
         };
         if (try_resolve_var_by_name(ctx, var.name, NULL)) {
             fprintf(stderr,
