@@ -3,6 +3,8 @@
 
 #include "lexer.h"
 
+// TODO: Document (& enforce?) the particular subset of expressions that can be
+// used to represent units
 // TODO: Add a way to automatically add metric prefixes to a unit through an
 // annotation
 /*
@@ -23,7 +25,7 @@
  *
  * assignmentExpr = NAME "=" expr | unitCastExpr
  *
- * unitCastExpr = geomExpr ("in" NAME)?
+ * unitCastExpr = geomExpr ("in" expr)?
  *
  * geomExpr = funcallExpr (("*" | "/") geomExpr)?
  *
@@ -103,7 +105,10 @@ typedef struct Expr {
 
         struct {
             struct Expr *value;
-            StringView target;
+
+            /// This is either a name or an algebraic representation of the
+            /// relevant compound unit
+            struct Expr *target;
         } unit_cast;
     } as;
 } Expr;

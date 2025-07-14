@@ -3,6 +3,7 @@
 #include "eval.h"
 
 #include <assert.h>
+#include <math.h>
 
 #define NOB_STRIP_PREFIX
 #include "nob.h"
@@ -221,6 +222,95 @@ static VarIndex resolve_var_by_name(EvalContext *ctx, StringView name)
     return res;
 }
 
+static CompoundUnit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
+{
+    switch (expr.type) {
+    case EXPR_TYPE_VAR: {
+        return (CompoundUnit) {
+            .elems_count = 1,
+            .elems[0] =
+                {
+                    .unit  = resolve_unit_by_name(ctx, expr.as.var.name),
+                    .power = 1,
+                },
+        };
+    }
+
+    case EXPR_TYPE_BINOP: {
+        CompoundUnit left  = resolve_unit_from_expr(ctx, *expr.as.binop.left);
+        CompoundUnit right = resolve_unit_from_expr(ctx, *expr.as.binop.right);
+
+        switch (expr.as.binop.op) {
+        case OP_MULT: {
+            for (size_t ru = 0; ru < right.elems_count; ru++) {
+                for (size_t lu = 0; lu < left.elems_count; lu++) {
+                    if (left.elems[lu].unit == right.elems[ru].unit) {
+                        left.elems[lu].power += right.elems[ru].power;
+                        goto mult_cont;
+                    }
+                }
+
+                if (left.elems_count + 1 >= COMPOUND_UNIT_CAP) {
+                    fprintf(stderr,
+                            "ERROR: Exceeded max cap of %d simple units in "
+                            "compound unit.\n",
+                            COMPOUND_UNIT_CAP);
+                    exit(1);
+                }
+                left.elems[left.elems_count++] = right.elems[ru];
+            mult_cont:
+                continue;
+            }
+
+            return left;
+        }
+
+        case OP_DIV: {
+            for (size_t ru = 0; ru < right.elems_count; ru++) {
+                for (size_t lu = 0; lu < left.elems_count; lu++) {
+                    if (left.elems[lu].unit == right.elems[ru].unit) {
+                        left.elems[lu].power -= right.elems[ru].power;
+                        goto div_cont;
+                    }
+                }
+
+                if (left.elems_count + 1 >= COMPOUND_UNIT_CAP) {
+                    fprintf(stderr,
+                            "ERROR: Exceeded max cap of %d simple units in "
+                            "compound unit.\n",
+                            COMPOUND_UNIT_CAP);
+                    exit(1);
+                }
+                left.elems[left.elems_count++] = (SimpleUnitPow) {
+                    .power = -right.elems[ru].power,
+                    .unit  = right.elems[ru].unit,
+                };
+            div_cont:
+                continue;
+            }
+
+            return left;
+        }
+
+        default:
+            fprintf(stderr, "ERROR: Illegal operation `");
+            op_print(stderr, expr.as.binop.op);
+            fprintf(stderr, "` in unit expression.\n");
+            exit(1);
+        }
+    }
+
+    case EXPR_TYPE_PAREN:
+        return resolve_unit_from_expr(ctx, *expr.as.paren.inner);
+
+    default:
+        fprintf(stderr, "ERROR: Can't resolve compound unit from expr: ");
+        expr_print(stderr, expr);
+        fprintf(stderr, ".\n");
+        exit(1);
+    }
+}
+
 static Value value_binop(Value left, Value right, Op op)
 {
     switch (op) {
@@ -298,17 +388,15 @@ Value val_print(EvalContext *ctx, Value value)
     };
 }
 
+/// Checks if a compound unit has any units that are not fundamental
 static bool compound_unit_is_fundamental(EvalContext *ctx, CompoundUnit unit)
 {
-    if (unit.elems_count != 1 || unit.elems[0].power != 1) {
-        fprintf(stderr, "%zu\n", unit.elems_count);
-        assert(0 &&
-               "TODO: compound_unit_is_fundamental is not implemented for "
-               "actually compound units");
+    for (size_t i = 0; i < unit.elems_count; i++) {
+        Dim dim =
+            ctx->dims.items[ctx->simple_units.items[unit.elems[i].unit].dim];
+        if (dim.fundamental_unit != unit.elems[i].unit) return false;
     }
-
-    Dim dim = ctx->dims.items[ctx->simple_units.items[unit.elems[0].unit].dim];
-    return dim.fundamental_unit == unit.elems[0].unit;
+    return true;
 }
 
 static bool compound_unit_is_castable(EvalContext *ctx, CompoundUnit a,
@@ -333,6 +421,46 @@ static bool compound_unit_is_castable(EvalContext *ctx, CompoundUnit a,
     }
 
     return true;
+}
+
+static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
+                                                      SimpleUnit unit)
+{
+    Value val = eval_expr(ctx, unit.expr);
+    // This should hold because this is a simple unit
+    assert(val.unit.elems_count == 1 && val.unit.elems[0].power == 1);
+    double conv_factor      = val.num;
+    SimpleUnit current_unit = ctx->simple_units.items[val.unit.elems[0].unit];
+
+    for (int i = 0; current_unit.expr.type != EXPR_TYPE_NONE; i++) {
+        if (i >= UNIT_CAST_MAX_DEPTH) {
+            fprintf(stderr,
+                    "ERROR: Exceeded max depth of %d while trying "
+                    "to cast to/from unit `" SV_FMT "`.\n",
+                    UNIT_CAST_MAX_DEPTH, SV_ARG(unit.name));
+            exit(1);
+        }
+
+        Value next = eval_expr(ctx, current_unit.expr);
+        assert(next.unit.elems_count == 1 && next.unit.elems[0].power == 1);
+
+        conv_factor *= next.num;
+        current_unit = ctx->simple_units.items[next.unit.elems[0].unit];
+    }
+    return conv_factor;
+}
+
+static double conversion_factor_to_fundamental(EvalContext *ctx,
+                                               CompoundUnit unit)
+{
+    double conv_factor = 1;
+    for (size_t i = 0; i < unit.elems_count; i++) {
+        double simple_factor = conversion_factor_to_fundamental_simple(
+            ctx, ctx->simple_units.items[unit.elems[i].unit]);
+        conv_factor *= pow(simple_factor, unit.elems[i].power);
+    }
+
+    return conv_factor;
 }
 
 Value eval_expr(EvalContext *ctx, Expr expr)
@@ -395,7 +523,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
             exit(1);
         }
 
-        ctx->vars.items[idx].value = rhs;
+        ctx->vars.items[idx].value       = rhs;
         ctx->vars.items[idx].initialised = true;
         return rhs;
     }
@@ -404,12 +532,14 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         if (sv_eq(expr.as.funcall.fun, SV("print"))) {
             if (expr.as.funcall.args.count == 0) {
                 fprintf(stderr,
-                        "ERROR: `print`: No argument provided (expected 1).\n");
+                        "ERROR: `print`: No argument provided "
+                        "(expected 1).\n");
                 exit(1);
             }
             if (expr.as.funcall.args.count > 1) {
                 fprintf(stderr,
-                        "ERROR: `print`: Too many arguments provided (got %zu, "
+                        "ERROR: `print`: Too many arguments provided "
+                        "(got %zu, "
                         "expected 1).\n",
                         expr.as.funcall.args.count);
                 exit(1);
@@ -424,7 +554,8 @@ Value eval_expr(EvalContext *ctx, Expr expr)
             }
             if (expr.as.funcall.args.count > 1) {
                 fprintf(stderr,
-                        "ERROR: `dump`: Too many arguments provided (got %zu, "
+                        "ERROR: `dump`: Too many arguments provided "
+                        "(got %zu, "
                         "expected 1).\n",
                         expr.as.funcall.args.count);
                 exit(1);
@@ -441,119 +572,50 @@ Value eval_expr(EvalContext *ctx, Expr expr)
             return val_print(ctx, input);
         } else {
             fprintf(stderr,
-                    "ERROR: TODO: Function calls are not implemented yet.\n");
+                    "ERROR: TODO: Function calls are not implemented "
+                    "yet.\n");
             fprintf(stderr,
                     "NOTE: Only the following standard functions are "
                     "implemented: \n");
-            fprintf(
-                stderr,
-                "\tprint - prints a value (intended for regular printing)\n");
             fprintf(stderr,
-                    "\tdump  - dumps a value/variable (intended for debugging "
+                    "\tprint - prints a value (intended for regular "
+                    "printing)\n");
+            fprintf(stderr,
+                    "\tdump  - dumps a value/variable (intended for "
+                    "debugging "
                     "the interpreter)\n");
             exit(1);
         }
     }
 
     case EXPR_TYPE_UNITCAST: {
-        SimpleUnitIndex target_id =
-            resolve_unit_by_name(ctx, expr.as.unit_cast.target);
-        SimpleUnit target = ctx->simple_units.items[target_id];
+        Value val           = eval_expr(ctx, *expr.as.unit_cast.value);
+        CompoundUnit source = val.unit;
+        CompoundUnit target =
+            resolve_unit_from_expr(ctx, *expr.as.unit_cast.target);
 
-        Value val = eval_expr(ctx, *expr.as.unit_cast.value);
-        if (val.unit.elems_count > 1 ||
-            (val.unit.elems_count == 1 && val.unit.elems[0].power != 1)) {
-            fprintf(stderr,
-                    "TODO: Dimension checking and unit casting for compound "
-                    "units is not yet implemented.\n");
-            exit(1);
-        }
-        SimpleUnit source = ctx->simple_units.items[val.unit.elems[0].unit];
-        if (source.dim != target.dim) {
-            fprintf(stderr,
-                    "ERROR: Cannot cast a value of dimension `" SV_FMT
-                    "` to unit `" SV_FMT "` of dimension `" SV_FMT "`.\n",
-                    SV_ARG(ctx->dims.items[source.dim].name),
-                    SV_ARG(target.name),
-                    SV_ARG(ctx->dims.items[target.dim].name));
+        if (!compound_unit_is_castable(ctx, source, target)) {
+            fprintf(stderr, "ERROR: Cannot cast a value of unit `");
+            compound_unit_dump(stderr, source);
+            fprintf(stderr, "` to unit `");
+            compound_unit_dump(stderr, target);
+            fprintf(stderr, "`: Dimensionality mismatch.\n");
             exit(1);
         }
 
-        // TODO: Support units that aren't just pure multiplication (e.g.
-        // Fahrenheit/Celsius)
+        // TODO: Support units that aren't just pure multiplication
+        // (e.g. Fahrenheit/Celsius)
         double conv_factor = 1;
-
-        if (target.expr.type != EXPR_TYPE_NONE) {
-            Value fun_to_target = eval_expr(ctx, target.expr);
-            for (int i = 0;
-                 !compound_unit_is_fundamental(ctx, fun_to_target.unit); i++) {
-                if (i >= UNIT_CAST_MAX_DEPTH) {
-                    fprintf(stderr,
-                            "ERROR: Exceeded max depth of %d while trying "
-                            "to cast "
-                            "to unit `" SV_FMT "`.\n",
-                            UNIT_CAST_MAX_DEPTH, SV_ARG(target.name));
-                    exit(1);
-                }
-
-                assert(fun_to_target.unit.elems_count == 1 &&
-                       fun_to_target.unit.elems[0].power == 1);
-                Value next = eval_expr(
-                    ctx,
-                    ctx->simple_units.items[fun_to_target.unit.elems[0].unit]
-                        .expr);
-
-                fun_to_target = (Value) {
-                    .num  = fun_to_target.num * next.num,
-                    .unit = next.unit,
-                };
-            }
-            assert(compound_unit_is_fundamental(ctx, fun_to_target.unit));
-
-            conv_factor /= fun_to_target.num;
+        if (!compound_unit_is_fundamental(ctx, target)) {
+            conv_factor /= conversion_factor_to_fundamental(ctx, target);
         }
-
-        if (source.expr.type != EXPR_TYPE_NONE) {
-            Value source_to_fun = eval_expr(ctx, source.expr);
-            for (int i = 0;
-                 !compound_unit_is_fundamental(ctx, source_to_fun.unit); i++) {
-                if (i >= UNIT_CAST_MAX_DEPTH) {
-                    fprintf(stderr,
-                            "ERROR: Exceeded max depth of %d while trying "
-                            "to cast "
-                            "from unit `" SV_FMT "`.\n",
-                            UNIT_CAST_MAX_DEPTH, SV_ARG(source.name));
-                    exit(1);
-                }
-
-                assert(source_to_fun.unit.elems_count == 1 &&
-                       source_to_fun.unit.elems[0].power == 1);
-                Value next = eval_expr(
-                    ctx,
-                    ctx->simple_units.items[source_to_fun.unit.elems[0].unit]
-                        .expr);
-
-                source_to_fun = (Value) {
-                    .num  = source_to_fun.num * next.num,
-                    .unit = next.unit,
-                };
-            }
-            assert(compound_unit_is_fundamental(ctx, source_to_fun.unit));
-
-            conv_factor *= source_to_fun.num;
+        if (!compound_unit_is_fundamental(ctx, source)) {
+            conv_factor *= conversion_factor_to_fundamental(ctx, source);
         }
 
         return (Value) {
-            .num = val.num * conv_factor,
-            .unit =
-                {
-                    .elems_count = 1,
-                    .elems[0] =
-                        {
-                            .unit  = target_id,
-                            .power = 1,
-                        },
-                },
+            .num  = val.num * conv_factor,
+            .unit = target,
         };
     }
 

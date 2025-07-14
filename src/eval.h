@@ -86,6 +86,7 @@ typedef struct {
 
 EvalContext new_context(void);
 void free_context(EvalContext *ctx);
+Value eval_expr(EvalContext *ctx, Expr expr);
 void eval_stmt(EvalContext *ctx, Stmt stmt);
 void dump_context(FILE *f, EvalContext *ctx);
 

@@ -182,15 +182,14 @@ static Expr parse_unit_cast_expr(Parser *self)
     }
     lex_token(&self->lexer);
 
-    Token unit = lex_token(&self->lexer);
-    ensure_tok_type(unit, TOK_TYPE_NAME, "a unit name after `in`");
+    Expr unit = parse_expr(self);
 
     return (Expr) {
         .type = EXPR_TYPE_UNITCAST,
         .as.unit_cast =
             {
                 .value  = parser_save_expr(self, value),
-                .target = unit.name,
+                .target = parser_save_expr(self, unit)
             },
     };
 }
@@ -427,7 +426,9 @@ void expr_print(FILE *f, Expr expr)
     } break;
 
     case EXPR_TYPE_UNITCAST: {
-        fprintf(f, "UnitCast(`" SV_FMT "`, ", SV_ARG(expr.as.unit_cast.target));
+        fprintf(f, "UnitCast(target = " ); 
+        expr_print(f, *expr.as.unit_cast.target); 
+        fprintf(f, ", value = ");
         expr_print(f, *expr.as.unit_cast.value);
         fputc(')', f);
     } break;
@@ -513,6 +514,7 @@ void expr_free(Expr expr)
 
     case EXPR_TYPE_UNITCAST:
         expr_free(*expr.as.unit_cast.value);
+        expr_free(*expr.as.unit_cast.target);
         free(expr.as.unit_cast.value);
 
     case EXPR_TYPE_NONE:
