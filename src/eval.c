@@ -85,7 +85,7 @@ void dump_context(FILE *f, EvalContext *ctx)
 
 EvalContext new_context(void)
 {
-    EvalContext ctx = {0};
+    EvalContext ctx   = {0};
     Dim dimensionless = {
         .name = SV("(dimensionless)"),
     };
@@ -291,7 +291,15 @@ Value eval_expr(EvalContext *ctx, Expr expr)
 
     case EXPR_TYPE_VAR: {
         VarIndex idx = resolve_var_by_name(ctx, expr.as.var.name);
-        return ctx->vars.items[idx].value;
+        Var var      = ctx->vars.items[idx];
+        if (!var.initialised) {
+            fprintf(stderr,
+                    "ERROR: Attempt to read uninitialised variable `" SV_FMT
+                    "`.\n",
+                    SV_ARG(var.name));
+            exit(1);
+        }
+        return var.value;
     }
 
     case EXPR_TYPE_ASSIGN: {
