@@ -471,10 +471,10 @@ void stmt_print(FILE *f, Stmt stmt)
 
     case STMT_TYPE_VAR_DECL: {
         fprintf(f, "VarDecl(name = `" SV_FMT "`, dim = `" SV_FMT "`",
-                SV_ARG(stmt.as.unit_decl.name), SV_ARG(stmt.as.unit_decl.dim));
-        if (stmt.as.unit_decl.value.type != EXPR_TYPE_NONE) {
+                SV_ARG(stmt.as.var_decl.name), SV_ARG(stmt.as.var_decl.dim));
+        if (stmt.as.var_decl.value.type != EXPR_TYPE_NONE) {
             fprintf(f, ", value = ");
-            expr_print(f, stmt.as.unit_decl.value);
+            expr_print(f, stmt.as.var_decl.value);
         }
         fputc(')', f);
     } break;
