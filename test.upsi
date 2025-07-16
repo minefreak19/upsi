@@ -8,6 +8,12 @@ unit second: time;
 unit minute: time = 60 second;
 unit hour: time = 60 minute;
 
+dim speed = length / time;
+dim acceleration = length / (time * time);
+dump();
+
+// unit mph: speed = 1 mile / 1 hour; // causes an error
+
 let s = 1 mile / 1 hour;
 print(s); 
 print(s in metre / second);

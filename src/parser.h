@@ -15,7 +15,7 @@
  *
  * statement = dimDecl | unitDecl | varDecl | expr ";"
  *
- * dimDecl = "dim" NAME ";"
+ * dimDecl = "dim" NAME ("=" expr)? ";"
  *
  * unitDecl = "unit" NAME ":" NAME ("=" expr)? ";"
  *
@@ -128,8 +128,9 @@ typedef struct {
     StmtType type;
     union {
         struct {
-            // TODO: Declare dimensions in terms of other dimensions
             StringView name;
+
+            Expr expr; 
         } dim_decl;
 
         struct {

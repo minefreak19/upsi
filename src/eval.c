@@ -31,7 +31,22 @@ static void simple_unit_dump(FILE *f, SimpleUnit u)
 
 static void dim_dump(FILE *f, Dim d)
 {
-    fprintf(f, "`" SV_FMT "` (%zu)", SV_ARG(d.name), d.fundamental_unit);
+    if (d.is_compound) {
+        // Otherwise, it should be a simple dimension
+        assert(d.as.compound.elems_count > 0);
+
+        fprintf(f, "`" SV_FMT "` [", SV_ARG(d.name));
+        fprintf(f, "(%zu, %" POWER_FMT ")", d.as.compound.elems[0].dim,
+                d.as.compound.elems[0].power);
+        for (size_t i = 1; i < d.as.compound.elems_count; i++) {
+            fprintf(f, ", (%zu, %" POWER_FMT ")", d.as.compound.elems[i].dim,
+                    d.as.compound.elems[i].power);
+        }
+        fprintf(f, "]");
+    } else {
+        fprintf(f, "`" SV_FMT "` (%zu)", SV_ARG(d.name),
+                d.as.simple.fundamental_unit);
+    }
 }
 
 static void compound_unit_dump(FILE *f, CompoundUnit u)
@@ -56,6 +71,7 @@ static void var_dump(FILE *f, Var v)
     }
 }
 
+// TODO: Improve debugging apparatus
 void dump_context(FILE *f, EvalContext *ctx)
 {
     fprintf(f, "EvalContext {\n");
@@ -311,6 +327,111 @@ static CompoundUnit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
     }
 }
 
+/// Intended to only be used for compound dimensions
+static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
+{
+    switch (expr.type) {
+    case EXPR_TYPE_VAR: {
+        return (Dim) {
+            .name        = SV(""),
+            .is_compound = true,
+            .as.compound =
+                {
+                    .elems_count = 1,
+                    .elems[0] =
+                        {
+                            .dim   = resolve_dim_by_name(ctx, expr.as.var.name),
+                            .power = 1,
+                        },
+                },
+        };
+    }
+
+    case EXPR_TYPE_BINOP: {
+        Dim left  = resolve_dim_from_expr(ctx, *expr.as.binop.left);
+        Dim right = resolve_dim_from_expr(ctx, *expr.as.binop.right);
+
+        assert(left.is_compound);
+        assert(right.is_compound);
+
+        switch (expr.as.binop.op) {
+        case OP_MULT: {
+            for (size_t rd = 0; rd < right.as.compound.elems_count; rd++) {
+                for (size_t ld = 0; ld < left.as.compound.elems_count; ld++) {
+                    if (left.as.compound.elems[ld].dim ==
+                        right.as.compound.elems[rd].dim) {
+                        left.as.compound.elems[ld].power +=
+                            right.as.compound.elems[rd].power;
+                        goto mult_cont;
+                    }
+                }
+
+                if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
+                    fprintf(
+                        stderr,
+                        "ERROR: Exceeded max cap of %d simple dimensions in "
+                        "compound dimension.\n",
+                        COMPOUND_DIM_CAP);
+                    exit(1);
+                }
+                left.as.compound.elems[left.as.compound.elems_count++] =
+                    right.as.compound.elems[rd];
+            mult_cont:
+                continue;
+            }
+
+            return left;
+        }
+
+        case OP_DIV: {
+            for (size_t ru = 0; ru < right.as.compound.elems_count; ru++) {
+                for (size_t lu = 0; lu < left.as.compound.elems_count; lu++) {
+                    if (left.as.compound.elems[lu].dim ==
+                        right.as.compound.elems[ru].dim) {
+                        left.as.compound.elems[lu].power -=
+                            right.as.compound.elems[ru].power;
+                        goto div_cont;
+                    }
+                }
+
+                if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
+                    fprintf(stderr,
+                            "ERROR: Exceeded max cap of %d simple dims in "
+                            "compound dim.\n",
+                            COMPOUND_DIM_CAP);
+                    exit(1);
+                }
+                left.as.compound.elems[left.as.compound.elems_count].power =
+                    -right.as.compound.elems[ru].power;
+                left.as.compound.elems[left.as.compound.elems_count].dim =
+                    right.as.compound.elems[ru].dim;
+                left.as.compound.elems_count++;
+            div_cont:
+                continue;
+            }
+
+            return left;
+        }
+
+        default:
+            fprintf(stderr, "ERROR: Illegal operation `");
+            op_print(stderr, expr.as.binop.op);
+            fprintf(stderr, "` in dimension expression.\n");
+            exit(1);
+        }
+    }
+
+    case EXPR_TYPE_PAREN:
+        return resolve_dim_from_expr(ctx, *expr.as.paren.inner);
+
+    default:
+        fprintf(stderr, "ERROR: Can't resolve compound unit from expr: ");
+        expr_print(stderr, expr);
+        fprintf(stderr, ".\n");
+        exit(1);
+    }
+}
+
 static Value value_binop(Value left, Value right, Op op)
 {
     switch (op) {
@@ -394,7 +515,10 @@ static bool compound_unit_is_fundamental(EvalContext *ctx, CompoundUnit unit)
     for (size_t i = 0; i < unit.elems_count; i++) {
         Dim dim =
             ctx->dims.items[ctx->simple_units.items[unit.elems[i].unit].dim];
-        if (dim.fundamental_unit != unit.elems[i].unit) return false;
+        // Since the compound unit should only be composed of simple units,
+        // pointing to simple dimensions
+        assert(!dim.is_compound);
+        if (dim.as.simple.fundamental_unit != unit.elems[i].unit) return false;
     }
     return true;
 }
@@ -638,10 +762,16 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
         return;
 
     case STMT_TYPE_DIM_DECL: {
-        Dim dim = {
-            .name             = stmt.as.dim_decl.name,
-            .fundamental_unit = UNITLESS,
-        };
+        Dim dim = {0};
+        if (stmt.as.dim_decl.expr.type != EXPR_TYPE_NONE) {
+            dim = resolve_dim_from_expr(ctx, stmt.as.dim_decl.expr);
+            assert(dim.is_compound);
+            assert(dim.as.compound.elems_count != 0);
+            assert(dim.as.compound.elems_count > 1 ||
+                   dim.as.compound.elems[0].power > 1);
+        }
+
+        dim.name = stmt.as.dim_decl.name;
 
         if (try_resolve_dim_by_name(ctx, dim.name, NULL)) {
             // TODO: Better (located) error reporting
@@ -653,6 +783,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             dump_context(stderr, ctx);
             exit(1);
         }
+
         da_append(&ctx->dims, dim);
         return;
     }
@@ -660,6 +791,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     case STMT_TYPE_UNIT_DECL: {
         DimIndex dim = resolve_dim_by_name(ctx, stmt.as.unit_decl.dim);
 
+        // TODO: Declaration of named compound units
         SimpleUnit unit = {
             .name = stmt.as.unit_decl.name,
             .dim  = dim,
@@ -677,23 +809,41 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             exit(1);
         }
 
+        assert(
+            !ctx->dims.items[unit.dim].is_compound &&
+            "TODO: Defining units in terms of compound dimensions is not yet "
+            "implemented");
+
         if (unit.expr.type == EXPR_TYPE_NONE) {
             Dim *dim = &ctx->dims.items[unit.dim];
-            if (dim->fundamental_unit != UNITLESS) {
+            if (dim->is_compound) {
+                // TODO: Compute fundamental unit for compound dimensions
                 fprintf(
                     stderr,
                     "ERROR: Dimension `" SV_FMT
-                    "` already has a fundamental unit `" SV_FMT
-                    "`. The unit `" SV_FMT
-                    "` must be expressed in terms of the fundamental "
-                    "unit.\n",
-                    SV_ARG(dim->name),
-                    SV_ARG(ctx->simple_units.items[dim->fundamental_unit].name),
-                    SV_ARG(unit.name));
+                    "` is a compound (derived) dimension and thus already has "
+                    "an implicit fundamental unit. The unit `" SV_FMT
+                    "` should be expressed in terms of simpler units.\n",
+                    SV_ARG(dim->name), SV_ARG(unit.name));
                 exit(1);
             }
 
-            dim->fundamental_unit = ctx->simple_units.count;
+            if (dim->as.simple.fundamental_unit != UNITLESS) {
+                fprintf(stderr,
+                        "ERROR: Simple dimension `" SV_FMT
+                        "` already has a fundamental unit `" SV_FMT
+                        "`. The unit `" SV_FMT
+                        "` must be expressed in terms of the fundamental "
+                        "unit.\n",
+                        SV_ARG(dim->name),
+                        SV_ARG(ctx->simple_units
+                                   .items[dim->as.simple.fundamental_unit]
+                                   .name),
+                        SV_ARG(unit.name));
+                exit(1);
+            }
+
+            dim->as.simple.fundamental_unit = ctx->simple_units.count;
         }
 
         da_append(&ctx->simple_units, unit);

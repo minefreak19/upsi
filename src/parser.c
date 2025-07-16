@@ -233,8 +233,15 @@ static Stmt parse_dim_decl(Parser *self)
 
     res.as.dim_decl.name = name.name;
 
+    Token next = lex_token(&self->lexer);
+    if (next.type == TOK_TYPE_SEMICOLON) return res;
+    ensure_tok_type(next, TOK_TYPE_EQ,
+                    "`=` or semicolon after dimension declaration");
+    res.as.dim_decl.expr = parse_expr(self);
+
     Token semi = lex_token(&self->lexer);
-    ensure_tok_type(semi, TOK_TYPE_SEMICOLON, "a semicolon");
+    ensure_tok_type(semi, TOK_TYPE_SEMICOLON,
+                    "a semicolon after dimension declaration");
 
     return res;
 }
