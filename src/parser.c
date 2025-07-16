@@ -189,7 +189,7 @@ static Expr parse_unit_cast_expr(Parser *self)
         .as.unit_cast =
             {
                 .value  = parser_save_expr(self, value),
-                .target = parser_save_expr(self, unit)
+                .target = parser_save_expr(self, unit),
             },
     };
 }
@@ -256,19 +256,14 @@ static Stmt parse_unit_decl(Parser *self)
     res.as.unit_decl.dim = dim_name.name;
 
     Token tok = lex_token(&self->lexer);
-    if (tok.type == TOK_TYPE_SEMICOLON) {
-        return res;
-    } else if (tok.type == TOK_TYPE_EQ) {
-        Expr expr = parse_expr(self);
+    if (tok.type == TOK_TYPE_SEMICOLON) return res;
 
-        res.as.unit_decl.value = expr;
-        return res;
-    } else {
-        loc_print(stderr, tok.loc);
-        fprintf(stderr,
-                ": ERROR: Expected `;` or `=` after unit declaration\n");
-        exit(1);
-    }
+    ensure_tok_type(tok, TOK_TYPE_EQ, "`;` or `=` after unit declaration");
+    res.as.unit_decl.value = parse_expr(self);
+
+    Token semi = lex_token(&self->lexer);
+    ensure_tok_type(semi, TOK_TYPE_SEMICOLON,
+                    "semicolon after unit definition");
 
     return res;
 }
@@ -426,8 +421,8 @@ void expr_print(FILE *f, Expr expr)
     } break;
 
     case EXPR_TYPE_UNITCAST: {
-        fprintf(f, "UnitCast(target = " ); 
-        expr_print(f, *expr.as.unit_cast.target); 
+        fprintf(f, "UnitCast(target = ");
+        expr_print(f, *expr.as.unit_cast.target);
         fprintf(f, ", value = ");
         expr_print(f, *expr.as.unit_cast.value);
         fputc(')', f);
