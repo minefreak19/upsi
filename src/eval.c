@@ -637,7 +637,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
 
         // TODO: Better error message here once compound dimensions are
         // figured out
-        if (ctx->vars.items->initialised &&
+        if (ctx->vars.items[idx].initialised &&
             !compound_unit_is_castable(ctx, ctx->vars.items[idx].value.unit,
                                        rhs.unit)) {
             fprintf(stderr,
