@@ -22,57 +22,60 @@ static bool simple_unit_is_fundamental(SimpleUnit unit)
     return unit.val.num == 0;
 }
 
-// TODO: Implement better pretty printing for some of these values
-// (e.g. print the name of the dimension/unit instead of just the index)
-static void dim_dump(FILE *f, Dim d)
+static void dim_dump(FILE *f, EvalContext *ctx, Dim d)
 {
     if (d.is_compound) {
         // Otherwise, it should be a simple dimension
         assert(d.as.compound.elems_count > 0);
 
-        fprintf(f, "`" SV_FMT "` [", SV_ARG(d.name));
-        fprintf(f, "(%zu, %" POWER_FMT ")", d.as.compound.elems[0].dim,
+        fprintf(f, "`" SV_FMT "` = [", SV_ARG(d.name));
+        fprintf(f, "(`" SV_FMT "`, %" POWER_FMT ")",
+                SV_ARG(ctx->dims.items[d.as.compound.elems[0].dim].name),
                 d.as.compound.elems[0].power);
         for (size_t i = 1; i < d.as.compound.elems_count; i++) {
-            fprintf(f, ", (%zu, %" POWER_FMT ")", d.as.compound.elems[i].dim,
+            fprintf(f, ", (`" SV_FMT "`, %" POWER_FMT ")",
+                    SV_ARG(ctx->dims.items[d.as.compound.elems[i].dim].name),
                     d.as.compound.elems[i].power);
         }
         fprintf(f, "]");
     } else {
-        fprintf(f, "`" SV_FMT "` (%zu)", SV_ARG(d.name),
-                d.as.simple.fundamental_unit);
+        fprintf(
+            f, "`" SV_FMT "` (`" SV_FMT "`)", SV_ARG(d.name),
+            SV_ARG(ctx->simple_units.items[d.as.simple.fundamental_unit].name));
     }
 }
 
-static void compound_unit_dump(FILE *f, CompoundUnit u)
+static void compound_unit_dump(FILE *f, EvalContext *ctx, CompoundUnit u)
 {
     for (size_t i = 0; i < u.elems_count; i++) {
-        fprintf(f, "(%zu, %" POWER_FMT ")", u.elems[i].unit, u.elems[i].power);
+        fprintf(f, "(`" SV_FMT "`, %" POWER_FMT ")",
+                SV_ARG(ctx->simple_units.items[u.elems[i].unit].name),
+                u.elems[i].power);
     }
 }
 
-static void val_dump(FILE *f, Value v)
+static void val_dump(FILE *f, EvalContext *ctx, Value v)
 {
     fprintf(f, "%f ", v.num);
-    compound_unit_dump(f, v.unit);
+    compound_unit_dump(f, ctx, v.unit);
 }
 
-static void simple_unit_dump(FILE *f, SimpleUnit u)
+static void simple_unit_dump(FILE *f, EvalContext *ctx, SimpleUnit u)
 {
     fprintf(f, "`" SV_FMT "` ", SV_ARG(u.name));
+    fprintf(f, "(`" SV_FMT "`)", SV_ARG(ctx->dims.items[u.dim].name));
     if (!simple_unit_is_fundamental(u)) {
-        fprintf(f, "= ");
-        val_dump(f, u.val);
+        fprintf(f, " = ");
+        val_dump(f, ctx, u.val);
     }
-    fprintf(f, "(%zu)", u.dim);
 }
 
-static void var_dump(FILE *f, Var v)
+static void var_dump(FILE *f, EvalContext *ctx, Var v)
 {
     fprintf(f, "`" SV_FMT "`", SV_ARG(v.name));
     if (v.initialised) {
         fprintf(f, " = ");
-        val_dump(f, v.value);
+        val_dump(f, ctx, v.value);
     }
 }
 
@@ -81,34 +84,39 @@ void dump_context(FILE *f, EvalContext *ctx)
 {
     fprintf(f, "EvalContext {\n");
     if (ctx->simple_units.count > 0) {
-        fprintf(f, "\tunits: [");
+        fprintf(f, "\tunits: [\n");
         // TODO: Print index as well
-        simple_unit_dump(f, ctx->simple_units.items[0]);
+        fprintf(f, "\t\t[0] = ");
+        simple_unit_dump(f, ctx, ctx->simple_units.items[0]);
         for (size_t i = 1; i < ctx->simple_units.count; i++) {
-            fprintf(f, ", ");
-            simple_unit_dump(f, ctx->simple_units.items[i]);
+            fprintf(f, ",\n");
+            fprintf(f, "\t\t[%zu] = ", i);
+            simple_unit_dump(f, ctx, ctx->simple_units.items[i]);
         }
-        fprintf(f, "],\n");
+        fprintf(f, "\n\t],\n");
     }
     if (ctx->dims.count > 0) {
-        fprintf(f, "\tdims: [");
+        fprintf(f, "\tdims: [\n");
         // TODO: Print index as well
-        dim_dump(f, ctx->dims.items[0]);
+        fprintf(f, "\t\t[0] = ");
+        dim_dump(f, ctx, ctx->dims.items[0]);
         for (size_t i = 1; i < ctx->dims.count; i++) {
-            fprintf(f, ", ");
-            dim_dump(f, ctx->dims.items[i]);
+            fprintf(f, ",\n");
+            fprintf(f, "\t\t[%zu] = ", i);
+            dim_dump(f, ctx, ctx->dims.items[i]);
         }
-        fprintf(f, "],\n");
+        fprintf(f, "\n\t],\n");
     }
     if (ctx->vars.count > 0) {
-        fprintf(f, "\tvars: [");
-        // TODO: Print index as well
-        var_dump(f, ctx->vars.items[0]);
+        fprintf(f, "\tvars: [\n");
+        fprintf(f, "\t\t[0] = ");
+        var_dump(f, ctx, ctx->vars.items[0]);
         for (size_t i = 1; i < ctx->vars.count; i++) {
-            fprintf(f, ", ");
-            var_dump(f, ctx->vars.items[i]);
+            fprintf(f, ",\n");
+            fprintf(f, "\t\t[%zu] = ", i);
+            var_dump(f, ctx, ctx->vars.items[i]);
         }
-        fprintf(f, "],\n");
+        fprintf(f, "\n\t],\n");
     }
     fprintf(f, "}\n");
 }
@@ -687,7 +695,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
 
             Expr inner = expr.as.funcall.args.items[0];
             if (inner.type == EXPR_TYPE_VAR) {
-                var_dump(stdout, ctx->vars.items[resolve_var_by_name(
+                var_dump(stdout, ctx, ctx->vars.items[resolve_var_by_name(
                                      ctx, inner.as.var.name)]);
             }
 
@@ -720,9 +728,9 @@ Value eval_expr(EvalContext *ctx, Expr expr)
 
         if (!compound_unit_is_castable(ctx, source, target)) {
             fprintf(stderr, "ERROR: Cannot cast a value of unit `");
-            compound_unit_dump(stderr, source);
+            compound_unit_dump(stderr, ctx, source);
             fprintf(stderr, "` to unit `");
-            compound_unit_dump(stderr, target);
+            compound_unit_dump(stderr, ctx, target);
             fprintf(stderr, "`: Dimensionality mismatch.\n");
             exit(1);
         }
