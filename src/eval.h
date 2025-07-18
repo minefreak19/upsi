@@ -5,6 +5,11 @@
 
 #include "parser.h"
 
+/*
+ * The definitions in this file are in a somewhat strange and disorganised
+ * order, because different structures here have weird dependency relations with
+ * others. It might be possible to clean up the definitions in the future.
+ */
 typedef size_t SimpleUnitIndex, DimIndex, VarIndex;
 
 /// Dimensionless and Unitless are always first in the evaluation context
@@ -14,12 +19,13 @@ typedef size_t SimpleUnitIndex, DimIndex, VarIndex;
 typedef int32_t Power;
 #define POWER_FMT PRIi32
 
-// TODO: Remove COMPOUND_DIM_CAP and COMPOUND_UNIT_CAP (make these arrays dynamic)
+// TODO: Remove COMPOUND_DIM_CAP and COMPOUND_UNIT_CAP (make these arrays
+// dynamic)
 // TODO: Support for anonymous dimensions
 
 /// Maximum number of distinct SimpleDims that can be composed in a compound
 /// unit
-#define COMPOUND_DIM_CAP 128 
+#define COMPOUND_DIM_CAP 128
 
 typedef struct {
     StringView name;
@@ -30,23 +36,14 @@ typedef struct {
         } simple;
 
         struct {
-            size_t elems_count; 
+            size_t elems_count;
             struct {
-                DimIndex dim; 
-                Power power; 
+                DimIndex dim;
+                Power power;
             } elems[COMPOUND_DIM_CAP];
         } compound;
     } as;
 } Dim;
-
-typedef struct {
-    StringView name;
-    DimIndex dim;
-
-    // This should have type EXPR_TYPE_NONE for a fundamental unit, and should
-    // otherwise be a mathematical expression in terms of a different unit.
-    Expr expr;
-} SimpleUnit;
 
 /// Shouldn't be used directly; encodes a simple unit raised to a particular
 /// power, as will be needed for variables with arbitrarily complex units
@@ -70,6 +67,15 @@ typedef struct {
     double num;
     CompoundUnit unit;
 } Value;
+
+typedef struct {
+    StringView name;
+    DimIndex dim;
+
+    // This should be (Value) {0} for a fundamental unit, and the computed value
+    // in terms of a different unit otherwise
+    Value val;
+} SimpleUnit;
 
 typedef struct {
     StringView name;

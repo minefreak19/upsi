@@ -17,18 +17,13 @@
 /// expression for a derived unit in terms of its dimensions fundamental unit
 #define UNIT_CAST_MAX_DEPTH 1024
 
-// TODO: Implement better pretty printing for some of these values
-// (e.g. print the name of the dimension/unit instead of just the index)
-static void simple_unit_dump(FILE *f, SimpleUnit u)
+static bool simple_unit_is_fundamental(SimpleUnit unit)
 {
-    fprintf(f, "`" SV_FMT "` ", SV_ARG(u.name));
-    if (u.expr.type != EXPR_TYPE_NONE) {
-        fprintf(f, "= ");
-        expr_print(f, u.expr);
-    }
-    fprintf(f, "(%zu)", u.dim);
+    return unit.val.num == 0;
 }
 
+// TODO: Implement better pretty printing for some of these values
+// (e.g. print the name of the dimension/unit instead of just the index)
 static void dim_dump(FILE *f, Dim d)
 {
     if (d.is_compound) {
@@ -60,6 +55,16 @@ static void val_dump(FILE *f, Value v)
 {
     fprintf(f, "%f ", v.num);
     compound_unit_dump(f, v.unit);
+}
+
+static void simple_unit_dump(FILE *f, SimpleUnit u)
+{
+    fprintf(f, "`" SV_FMT "` ", SV_ARG(u.name));
+    if (!simple_unit_is_fundamental(u)) {
+        fprintf(f, "= ");
+        val_dump(f, u.val);
+    }
+    fprintf(f, "(%zu)", u.dim);
 }
 
 static void var_dump(FILE *f, Var v)
@@ -119,7 +124,7 @@ EvalContext new_context(void)
     SimpleUnit unitless = {
         .name = SV("(unitless)"),
         .dim  = 0,
-        .expr = {0},
+        .val  = {0},
     };
     da_append(&ctx.simple_units, unitless);
 
@@ -128,12 +133,7 @@ EvalContext new_context(void)
 
 void free_context(EvalContext *ctx)
 {
-    for (size_t i = 0; i < ctx->simple_units.count; i++) {
-        expr_free(ctx->simple_units.items[i].expr);
-    }
     free(ctx->simple_units.items);
-    // Nothing to do for dimensions or variables
-    // TODO: This will change once compound dimensions are added
     free(ctx->dims.items);
     free(ctx->vars.items);
     *ctx = (EvalContext) {0};
@@ -550,13 +550,13 @@ static bool compound_unit_is_castable(EvalContext *ctx, CompoundUnit a,
 static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
                                                       SimpleUnit unit)
 {
-    Value val = eval_expr(ctx, unit.expr);
     // This should hold because this is a simple unit
-    assert(val.unit.elems_count == 1 && val.unit.elems[0].power == 1);
-    double conv_factor      = val.num;
-    SimpleUnit current_unit = ctx->simple_units.items[val.unit.elems[0].unit];
+    assert(unit.val.unit.elems_count == 1 && unit.val.unit.elems[0].power == 1);
+    double conv_factor = unit.val.num;
+    SimpleUnit current_unit =
+        ctx->simple_units.items[unit.val.unit.elems[0].unit];
 
-    for (int i = 0; current_unit.expr.type != EXPR_TYPE_NONE; i++) {
+    for (int i = 0; !simple_unit_is_fundamental(current_unit); i++) {
         if (i >= UNIT_CAST_MAX_DEPTH) {
             fprintf(stderr,
                     "ERROR: Exceeded max depth of %d while trying "
@@ -565,7 +565,7 @@ static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
             exit(1);
         }
 
-        Value next = eval_expr(ctx, current_unit.expr);
+        Value next = current_unit.val;
         assert(next.unit.elems_count == 1 && next.unit.elems[0].power == 1);
 
         conv_factor *= next.num;
@@ -795,9 +795,9 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
         SimpleUnit unit = {
             .name = stmt.as.unit_decl.name,
             .dim  = dim,
-            // TODO: Renamet his quantity to `as.unit_decl.expr` as well for
-            // consistency
-            .expr = stmt.as.unit_decl.value,
+            .val  = stmt.as.unit_decl.value.type != EXPR_TYPE_NONE
+                        ? eval_expr(ctx, stmt.as.unit_decl.value)
+                        : (Value) {0},
         };
         if (try_resolve_unit_by_name(ctx, unit.name, NULL)) {
             // TODO: Better (located) error reporting
@@ -814,7 +814,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             "TODO: Defining units in terms of compound dimensions is not yet "
             "implemented");
 
-        if (unit.expr.type == EXPR_TYPE_NONE) {
+        if (simple_unit_is_fundamental(unit)) {
             Dim *dim = &ctx->dims.items[unit.dim];
             if (dim->is_compound) {
                 // TODO: Compute fundamental unit for compound dimensions

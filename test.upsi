@@ -18,33 +18,33 @@ let s = 1 mile / 1 hour;
 print(s); 
 print(s in metre / second);
 
-// let y;
-// let x = 3 mile; 
-// let z = 2 * x;
-// 
-// // This is a comment
-// y = 1 / x; 
-// print(y);
-// y = x / (x*x);
-// print(y);
-// print(1 / x);
-// print(y in metre / (metre * metre));
-// print(1 / (x in metre));
-// print((y in metre / (metre * metre)) in (mile / (mile * mile)));
+let y;
+let x = 3 mile; 
+let z = 2 * x;
+
+// This is a comment
+y = 1 / x; 
+print(y);
+y = x / (x*x);
+print(y);
+print(1 / x);
+print(y in metre / (metre * metre));
+print(1 / (x in metre));
+print((y in metre / (metre * metre)) in (mile / (mile * mile)));
 
 
-// print(x);
-// print(x in metre);
-// print((1 yard) in mile);
-// print(1 mile in yard);
-// print(x in yard);
-// print(1 hour in second);
-// print(1 second in hour);
+print(x);
+print(x in metre);
+print((1 yard) in mile);
+print(1 mile in yard);
+print(x in yard);
+print(1 hour in second);
+print(1 second in hour);
 
-// x = x in metre;
-// print((x in metre)*x);
-// print((x)*x);
-// print(x / x);
+x = x in metre;
+print((x in metre)*x);
+print((x)*x);
+print(x / x);
 
 // print(z*x/y in metre);
 // print(z*x/(y in metre));
