@@ -17,7 +17,17 @@
 /// expression for a derived unit in terms of its dimensions fundamental unit
 #define UNIT_CAST_MAX_DEPTH 1024
 
-static bool simple_unit_is_fundamental(SimpleUnit unit)
+// `simple` in this sense means uni-dimensional
+static inline bool named_unit_is_simple(NamedUnit unit)
+{
+    if (unit.val.num == 0) return true;
+    if (unit.val.unit.elems_count > 1) return false;
+    assert(unit.val.unit.elems_count > 0);
+    if (unit.val.unit.elems[0].power > 1) return false;
+    return true;
+}
+
+static bool named_unit_is_fundamental(NamedUnit unit)
 {
     return unit.val.num == 0;
 }
@@ -41,7 +51,7 @@ static void dim_dump(FILE *f, EvalContext *ctx, Dim d)
     } else {
         fprintf(
             f, "`" SV_FMT "` (`" SV_FMT "`)", SV_ARG(d.name),
-            SV_ARG(ctx->simple_units.items[d.as.simple.fundamental_unit].name));
+            SV_ARG(ctx->named_units.items[d.as.simple.fundamental_unit].name));
     }
 }
 
@@ -49,7 +59,7 @@ static void compound_unit_dump(FILE *f, EvalContext *ctx, CompoundUnit u)
 {
     for (size_t i = 0; i < u.elems_count; i++) {
         fprintf(f, "(`" SV_FMT "`, %" POWER_FMT ")",
-                SV_ARG(ctx->simple_units.items[u.elems[i].unit].name),
+                SV_ARG(ctx->named_units.items[u.elems[i].unit].name),
                 u.elems[i].power);
     }
 }
@@ -60,11 +70,11 @@ static void val_dump(FILE *f, EvalContext *ctx, Value v)
     compound_unit_dump(f, ctx, v.unit);
 }
 
-static void simple_unit_dump(FILE *f, EvalContext *ctx, SimpleUnit u)
+static void named_unit_dump(FILE *f, EvalContext *ctx, NamedUnit u)
 {
     fprintf(f, "`" SV_FMT "` ", SV_ARG(u.name));
     fprintf(f, "(`" SV_FMT "`)", SV_ARG(ctx->dims.items[u.dim].name));
-    if (!simple_unit_is_fundamental(u)) {
+    if (!named_unit_is_fundamental(u)) {
         fprintf(f, " = ");
         val_dump(f, ctx, u.val);
     }
@@ -83,15 +93,15 @@ static void var_dump(FILE *f, EvalContext *ctx, Var v)
 void dump_context(FILE *f, EvalContext *ctx)
 {
     fprintf(f, "EvalContext {\n");
-    if (ctx->simple_units.count > 0) {
+    if (ctx->named_units.count > 0) {
         fprintf(f, "\tunits: [\n");
         // TODO: Print index as well
         fprintf(f, "\t\t[0] = ");
-        simple_unit_dump(f, ctx, ctx->simple_units.items[0]);
-        for (size_t i = 1; i < ctx->simple_units.count; i++) {
+        named_unit_dump(f, ctx, ctx->named_units.items[0]);
+        for (size_t i = 1; i < ctx->named_units.count; i++) {
             fprintf(f, ",\n");
             fprintf(f, "\t\t[%zu] = ", i);
-            simple_unit_dump(f, ctx, ctx->simple_units.items[i]);
+            named_unit_dump(f, ctx, ctx->named_units.items[i]);
         }
         fprintf(f, "\n\t],\n");
     }
@@ -129,19 +139,19 @@ EvalContext new_context(void)
     };
     da_append(&ctx.dims, dimensionless);
 
-    SimpleUnit unitless = {
+    NamedUnit unitless = {
         .name = SV("(unitless)"),
         .dim  = 0,
         .val  = {0},
     };
-    da_append(&ctx.simple_units, unitless);
+    da_append(&ctx.named_units, unitless);
 
     return ctx;
 }
 
 void free_context(EvalContext *ctx)
 {
-    free(ctx->simple_units.items);
+    free(ctx->named_units.items);
     free(ctx->dims.items);
     free(ctx->vars.items);
     *ctx = (EvalContext) {0};
@@ -172,11 +182,11 @@ static bool try_resolve_dim_by_name(EvalContext *ctx, StringView name,
 /// resp == NULL, simply returns whether the unit exists. If the unit
 /// does not exist, returns false and does not modify `*resp`
 static bool try_resolve_unit_by_name(EvalContext *ctx, StringView name,
-                                     SimpleUnitIndex *resp)
+                                     NamedUnitIndex *resp)
 {
-    SimpleUnitIndex idx;
-    for (idx = 0; idx < ctx->simple_units.count; idx++) {
-        if (sv_eq(name, ctx->simple_units.items[idx].name)) {
+    NamedUnitIndex idx;
+    for (idx = 0; idx < ctx->named_units.count; idx++) {
+        if (sv_eq(name, ctx->named_units.items[idx].name)) {
             if (resp != NULL) {
                 *resp = idx;
             }
@@ -220,9 +230,9 @@ static DimIndex resolve_dim_by_name(EvalContext *ctx, StringView name)
     return res;
 }
 
-static SimpleUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
+static NamedUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
 {
-    SimpleUnitIndex res;
+    NamedUnitIndex res;
     if (!try_resolve_unit_by_name(ctx, name, &res)) {
         fprintf(stderr, "ERROR: Could not resolve unit `" SV_FMT "`.\n",
                 SV_ARG(name));
@@ -276,7 +286,8 @@ static CompoundUnit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
 
                 if (left.elems_count + 1 >= COMPOUND_UNIT_CAP) {
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d simple units in "
+                            "ERROR: Exceeded max cap of %d distinct simple "
+                            "units in "
                             "compound unit.\n",
                             COMPOUND_UNIT_CAP);
                     exit(1);
@@ -300,11 +311,14 @@ static CompoundUnit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
 
                 if (left.elems_count + 1 >= COMPOUND_UNIT_CAP) {
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d simple units in "
+                            "ERROR: Exceeded max cap of %d distinct simple "
+                            "units in "
                             "compound unit.\n",
                             COMPOUND_UNIT_CAP);
                     exit(1);
                 }
+                assert(named_unit_is_simple(
+                    ctx->named_units.items[right.elems[ru].unit]));
                 left.elems[left.elems_count++] = (SimpleUnitPow) {
                     .power = -right.elems[ru].power,
                     .unit  = right.elems[ru].unit,
@@ -375,11 +389,11 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
                 }
 
                 if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
-                    fprintf(
-                        stderr,
-                        "ERROR: Exceeded max cap of %d simple dimensions in "
-                        "compound dimension.\n",
-                        COMPOUND_DIM_CAP);
+                    fprintf(stderr,
+                            "ERROR: Exceeded max cap of %d distinct simple "
+                            "dimensions in "
+                            "compound dimension.\n",
+                            COMPOUND_DIM_CAP);
                     exit(1);
                 }
                 left.as.compound.elems[left.as.compound.elems_count++] =
@@ -404,8 +418,9 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
 
                 if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d simple dims in "
-                            "compound dim.\n",
+                            "ERROR: Exceeded max cap of %d distinct simple "
+                            "dimensions in "
+                            "compound dimension.\n",
                             COMPOUND_DIM_CAP);
                     exit(1);
                 }
@@ -453,10 +468,11 @@ static Value value_binop(Value left, Value right, Op op)
             }
 
             if (left.unit.elems_count + 1 >= COMPOUND_UNIT_CAP) {
-                fprintf(stderr,
-                        "ERROR: Exceeded max cap of %d simple units in "
-                        "compound unit.\n",
-                        COMPOUND_UNIT_CAP);
+                fprintf(
+                    stderr,
+                    "ERROR: Exceeded max cap of %d distinct simple units in "
+                    "compound unit.\n",
+                    COMPOUND_UNIT_CAP);
                 exit(1);
             }
             left.unit.elems[left.unit.elems_count++] = right.unit.elems[ru];
@@ -487,10 +503,10 @@ static Value value_binop(Value left, Value right, Op op)
     }
 }
 
-static int simple_unit_pow_print(EvalContext *ctx, SimpleUnitPow sup)
+static int named_unit_pow_print(EvalContext *ctx, SimpleUnitPow sup)
 {
     int printed = 0;
-    printed += printf(SV_FMT, SV_ARG(ctx->simple_units.items[sup.unit].name));
+    printed += printf(SV_FMT, SV_ARG(ctx->named_units.items[sup.unit].name));
     if (sup.power != 1) {
         printed += printf("^%" POWER_FMT, sup.power);
     }
@@ -504,10 +520,10 @@ Value val_print(EvalContext *ctx, Value value)
     int printed = printf("%f", value.num);
     if (value.unit.elems_count > 0) {
         printed += printf(" ");
-        printed += simple_unit_pow_print(ctx, value.unit.elems[0]);
+        printed += named_unit_pow_print(ctx, value.unit.elems[0]);
         for (size_t i = 1; i < value.unit.elems_count; i++) {
             printed += printf(" * ");
-            printed += simple_unit_pow_print(ctx, value.unit.elems[i]);
+            printed += named_unit_pow_print(ctx, value.unit.elems[i]);
         }
     }
     printed += printf("\n");
@@ -522,7 +538,7 @@ static bool compound_unit_is_fundamental(EvalContext *ctx, CompoundUnit unit)
 {
     for (size_t i = 0; i < unit.elems_count; i++) {
         Dim dim =
-            ctx->dims.items[ctx->simple_units.items[unit.elems[i].unit].dim];
+            ctx->dims.items[ctx->named_units.items[unit.elems[i].unit].dim];
         // Since the compound unit should only be composed of simple units,
         // pointing to simple dimensions
         assert(!dim.is_compound);
@@ -537,14 +553,14 @@ static bool compound_unit_is_castable(EvalContext *ctx, CompoundUnit a,
     for (DimIndex dim = 0; dim < ctx->dims.count; dim++) {
         Power power_a = 0;
         for (size_t j = 0; j < a.elems_count; j++) {
-            if (ctx->simple_units.items[a.elems[j].unit].dim == dim) {
+            if (ctx->named_units.items[a.elems[j].unit].dim == dim) {
                 power_a += a.elems[j].power;
             }
         }
 
         Power power_b = 0;
         for (size_t j = 0; j < b.elems_count; j++) {
-            if (ctx->simple_units.items[b.elems[j].unit].dim == dim) {
+            if (ctx->named_units.items[b.elems[j].unit].dim == dim) {
                 power_b += b.elems[j].power;
             }
         }
@@ -556,15 +572,16 @@ static bool compound_unit_is_castable(EvalContext *ctx, CompoundUnit a,
 }
 
 static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
-                                                      SimpleUnit unit)
+                                                      NamedUnit unit)
 {
+    assert(named_unit_is_simple(unit));
     // This should hold because this is a simple unit
     assert(unit.val.unit.elems_count == 1 && unit.val.unit.elems[0].power == 1);
     double conv_factor = unit.val.num;
-    SimpleUnit current_unit =
-        ctx->simple_units.items[unit.val.unit.elems[0].unit];
+    NamedUnit current_unit =
+        ctx->named_units.items[unit.val.unit.elems[0].unit];
 
-    for (int i = 0; !simple_unit_is_fundamental(current_unit); i++) {
+    for (int i = 0; !named_unit_is_fundamental(current_unit); i++) {
         if (i >= UNIT_CAST_MAX_DEPTH) {
             fprintf(stderr,
                     "ERROR: Exceeded max depth of %d while trying "
@@ -573,11 +590,12 @@ static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
             exit(1);
         }
 
+        assert(named_unit_is_simple(current_unit));
         Value next = current_unit.val;
         assert(next.unit.elems_count == 1 && next.unit.elems[0].power == 1);
 
         conv_factor *= next.num;
-        current_unit = ctx->simple_units.items[next.unit.elems[0].unit];
+        current_unit = ctx->named_units.items[next.unit.elems[0].unit];
     }
     return conv_factor;
 }
@@ -588,7 +606,7 @@ static double conversion_factor_to_fundamental(EvalContext *ctx,
     double conv_factor = 1;
     for (size_t i = 0; i < unit.elems_count; i++) {
         double simple_factor = conversion_factor_to_fundamental_simple(
-            ctx, ctx->simple_units.items[unit.elems[i].unit]);
+            ctx, ctx->named_units.items[unit.elems[i].unit]);
         conv_factor *= pow(simple_factor, unit.elems[i].power);
     }
 
@@ -601,20 +619,21 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     case EXPR_TYPE_NUM: {
         double num = expr.as.num.val;
         // TODO: Support compound unit literals
-        SimpleUnitIndex sui = (sv_is_empty(expr.as.num.unit))
-                                  ? UNITLESS
-                                  : resolve_unit_by_name(ctx, expr.as.num.unit);
+        NamedUnitIndex nui = (sv_is_empty(expr.as.num.unit))
+                                 ? UNITLESS
+                                 : resolve_unit_by_name(ctx, expr.as.num.unit);
 
+        assert(named_unit_is_simple(ctx->named_units.items[nui]));
         return (Value) {
             .num = num,
             .unit =
                 {
                     .elems[0] =
                         {
-                            .unit  = sui,
+                            .unit  = nui,
                             .power = 1,
                         },
-                    .elems_count = sui == UNITLESS ? 0 : 1,
+                    .elems_count = nui == UNITLESS ? 0 : 1,
                 },
         };
     }
@@ -695,8 +714,10 @@ Value eval_expr(EvalContext *ctx, Expr expr)
 
             Expr inner = expr.as.funcall.args.items[0];
             if (inner.type == EXPR_TYPE_VAR) {
-                var_dump(stdout, ctx, ctx->vars.items[resolve_var_by_name(
-                                     ctx, inner.as.var.name)]);
+                var_dump(
+                    stdout, ctx,
+                    ctx->vars
+                        .items[resolve_var_by_name(ctx, inner.as.var.name)]);
             }
 
             Value input = eval_expr(ctx, inner);
@@ -800,7 +821,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
         DimIndex dim = resolve_dim_by_name(ctx, stmt.as.unit_decl.dim);
 
         // TODO: Declaration of named compound units
-        SimpleUnit unit = {
+        NamedUnit unit = {
             .name = stmt.as.unit_decl.name,
             .dim  = dim,
             .val  = stmt.as.unit_decl.value.type != EXPR_TYPE_NONE
@@ -822,7 +843,8 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             "TODO: Defining units in terms of compound dimensions is not yet "
             "implemented");
 
-        if (simple_unit_is_fundamental(unit)) {
+        // Trying to define a fundamental unit
+        if (named_unit_is_fundamental(unit)) {
             Dim *dim = &ctx->dims.items[unit.dim];
             if (dim->is_compound) {
                 // TODO: Compute fundamental unit for compound dimensions
@@ -836,6 +858,8 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                 exit(1);
             }
 
+            // TODO: Add assertions/errors that prevent a dimension without an
+            // instantiated fundamental unit from being used in variables
             if (dim->as.simple.fundamental_unit != UNITLESS) {
                 fprintf(stderr,
                         "ERROR: Simple dimension `" SV_FMT
@@ -844,17 +868,17 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                         "` must be expressed in terms of the fundamental "
                         "unit.\n",
                         SV_ARG(dim->name),
-                        SV_ARG(ctx->simple_units
+                        SV_ARG(ctx->named_units
                                    .items[dim->as.simple.fundamental_unit]
                                    .name),
                         SV_ARG(unit.name));
                 exit(1);
             }
 
-            dim->as.simple.fundamental_unit = ctx->simple_units.count;
+            dim->as.simple.fundamental_unit = ctx->named_units.count;
         }
 
-        da_append(&ctx->simple_units, unit);
+        da_append(&ctx->named_units, unit);
 
         return;
     }
