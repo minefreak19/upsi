@@ -94,6 +94,11 @@ int main(int argc, char **argv)
     if (args.debug) dump_context(stdout, &ctx);
     for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
          stmt      = parse_stmt(&parser)) {
+        if (args.debug) {
+            printf("Parsed stmt: ");
+            stmt_print(stdout, stmt);
+            printf("\n");
+        }
         eval_stmt(&ctx, stmt);
         if (args.debug) dump_context(stdout, &ctx);
     }

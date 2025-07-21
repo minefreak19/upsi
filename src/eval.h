@@ -57,16 +57,24 @@ typedef struct {
 /// unit
 #define COMPOUND_UNIT_CAP COMPOUND_DIM_CAP
 
-// TODO: The current implementation of compound units is memory intensive when
-// many values have the same compound unit. Can this be improved?
 typedef struct {
     SimpleUnitPow elems[COMPOUND_UNIT_CAP];
     size_t elems_count;
 } CompoundUnit;
 
+// NOTE: a (Unit) {0} should always create a clearly UNITLESS unit, rather than
+// some invalid state or edge case
+typedef struct {
+    bool is_anonymous;
+    union {
+        CompoundUnit compound;  // if is_anonymous is true
+        NamedUnitIndex named;
+    };
+} Unit;
+
 typedef struct {
     double num;
-    CompoundUnit unit;
+    Unit unit;
 } Value;
 
 typedef struct {
@@ -115,6 +123,13 @@ EvalContext new_context(void);
 void free_context(EvalContext *ctx);
 Value eval_expr(EvalContext *ctx, Expr expr);
 void eval_stmt(EvalContext *ctx, Stmt stmt);
+
+void dim_dump(FILE *f, EvalContext *ctx, Dim d);
+void named_unit_dump(FILE *f, EvalContext *ctx, NamedUnit u);
+void compound_unit_dump(FILE *f, EvalContext *ctx, CompoundUnit u);
+void unit_dump(FILE *f, EvalContext *ctx, Unit u);
+void val_dump(FILE *f, EvalContext *ctx, Value v);
+void var_dump(FILE *f, EvalContext *ctx, Var v);
 void dump_context(FILE *f, EvalContext *ctx);
 
 #endif  // EVAL_H_
