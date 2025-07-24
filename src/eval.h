@@ -10,11 +10,11 @@
  * order, because different structures here have weird dependency relations with
  * others. It might be possible to clean up the definitions in the future.
  */
-typedef size_t SimpleUnitIndex, DimIndex, VarIndex;
+typedef size_t NamedUnitIndex, DimIndex, VarIndex;
 
 /// Dimensionless and Unitless are always first in the evaluation context
 #define DIMLESS ((DimIndex) 0)
-#define UNITLESS ((SimpleUnitIndex) 0)
+#define UNITLESS ((NamedUnitIndex) 0)
 
 typedef int32_t Power;
 #define POWER_FMT PRIi32
@@ -23,8 +23,8 @@ typedef int32_t Power;
 // dynamic)
 // TODO: Support for anonymous dimensions
 
-/// Maximum number of distinct SimpleDims that can be composed in a compound
-/// unit
+/// Maximum number of distinct simple dims that can be composed in a compound
+/// dimension
 #define COMPOUND_DIM_CAP 128
 
 typedef struct {
@@ -32,7 +32,7 @@ typedef struct {
     bool is_compound;
     union {
         struct {
-            SimpleUnitIndex fundamental_unit;
+            NamedUnitIndex fundamental_unit;
         } simple;
 
         struct {
@@ -48,24 +48,33 @@ typedef struct {
 /// Shouldn't be used directly; encodes a simple unit raised to a particular
 /// power, as will be needed for variables with arbitrarily complex units
 typedef struct {
-    SimpleUnitIndex unit;
+    /// This should always point to a simple unit
+    NamedUnitIndex unit;
     Power power;
 } SimpleUnitPow;
 
-/// Maximum number of distinct SimpleUnits that can be composed in a compound
+/// Maximum number of distinct simple units that can be composed in a compound
 /// unit
 #define COMPOUND_UNIT_CAP COMPOUND_DIM_CAP
 
-// TODO: The current implementation of compound units is memory intensive when
-// many values have the same compound unit. Can this be improved?
 typedef struct {
     SimpleUnitPow elems[COMPOUND_UNIT_CAP];
     size_t elems_count;
 } CompoundUnit;
 
+// NOTE: a (Unit) {0} should always create a clearly UNITLESS unit, rather than
+// some invalid state or edge case
+typedef struct {
+    bool is_anonymous;
+    union {
+        CompoundUnit compound;  // if is_anonymous is true
+        NamedUnitIndex named;
+    };
+} Unit;
+
 typedef struct {
     double num;
-    CompoundUnit unit;
+    Unit unit;
 } Value;
 
 typedef struct {
@@ -75,7 +84,7 @@ typedef struct {
     // This should be (Value) {0} for a fundamental unit, and the computed value
     // in terms of a different unit otherwise
     Value val;
-} SimpleUnit;
+} NamedUnit;
 
 typedef struct {
     StringView name;
@@ -98,10 +107,10 @@ typedef struct {
 
     /// units.items[0] is special and always refers to the "unitless" unit
     struct {
-        SimpleUnit *items;
+        NamedUnit *items;
         size_t count;
         size_t capacity;
-    } simple_units;
+    } named_units;
 
     struct {
         Var *items;
@@ -114,6 +123,13 @@ EvalContext new_context(void);
 void free_context(EvalContext *ctx);
 Value eval_expr(EvalContext *ctx, Expr expr);
 void eval_stmt(EvalContext *ctx, Stmt stmt);
+
+void dim_dump(FILE *f, EvalContext *ctx, Dim d);
+void named_unit_dump(FILE *f, EvalContext *ctx, NamedUnit u);
+void compound_unit_dump(FILE *f, EvalContext *ctx, CompoundUnit u);
+void unit_dump(FILE *f, EvalContext *ctx, Unit u);
+void val_dump(FILE *f, EvalContext *ctx, Value v);
+void var_dump(FILE *f, EvalContext *ctx, Var v);
 void dump_context(FILE *f, EvalContext *ctx);
 
 #endif  // EVAL_H_

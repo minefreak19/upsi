@@ -8,15 +8,25 @@ unit second: time;
 unit minute: time = 60 second;
 unit hour: time = 60 minute;
 
-dim speed = length / time;
-dim acceleration = length / (time * time);
-dump();
+dim speed = length / time; 
+dim acceleration = length / (time * time); 
 
-// unit mph: speed = 1 mile / 1 hour; // causes an error
+unit mph: speed = 1 mile / 1 hour; 
+unit kph: speed = 1000 metre / 1 hour;
 
-let s = 1 mile / 1 hour;
-print(s); 
+let s = 1 mph;
+let t = 1 kph;
+print(s);
+print(t);
+print(t in metre / second);
+print(t in mile / hour);
+print(s / t);
+// TODO: Add a way to express unitless
+print(s / t in mile / mile);
+print((s / t) in mph / kph);
+print((s / t) in kph / mph);
 print(s in metre / second);
+print(t in mph);
 
 let y;
 let x = 3 mile; 
@@ -32,7 +42,6 @@ print(y in metre / (metre * metre));
 print(1 / (x in metre));
 print((y in metre / (metre * metre)) in (mile / (mile * mile)));
 
-
 print(x);
 print(x in metre);
 print((1 yard) in mile);
@@ -46,7 +55,5 @@ print((x in metre)*x);
 print((x)*x);
 print(x / x);
 
-// print(z*x/y in metre);
-// print(z*x/(y in metre));
-
-dump();
+print(z*x/y);
+print(z*x/y in metre * metre * metre);
