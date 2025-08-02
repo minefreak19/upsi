@@ -49,8 +49,6 @@ static Expr *parser_save_expr(Parser *self, Expr expr)
     return exprp;
 }
 
-// TODO: These functions can probably accept the next token if it's already
-// peeked, thus saving redoing some of the lexing work
 static Expr parse_primary_expr(Parser *self)
 {
     Token tok = lex_token(&self->lexer);

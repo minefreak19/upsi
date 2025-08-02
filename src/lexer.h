@@ -35,7 +35,6 @@ typedef enum {
     TOK_TYPE__SYMB_END,
 
     TOK_TYPE_NAME,
-    // TODO: Do we need INT and FLOAT to be separate?
     TOK_TYPE_NUM,
 
     TOK_TYPE__COUNT,

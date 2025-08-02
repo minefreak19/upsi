@@ -832,7 +832,6 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     case STMT_TYPE_UNIT_DECL: {
         DimIndex dim = resolve_dim_by_name(ctx, stmt.as.unit_decl.dim);
 
-        // TODO: Declaration of named compound units
         NamedUnit unit = {
             .name = stmt.as.unit_decl.name,
             .dim  = dim,
@@ -1029,7 +1028,6 @@ void dump_context(FILE *f, EvalContext *ctx)
     fprintf(f, "EvalContext {\n");
     if (ctx->named_units.count > 0) {
         fprintf(f, "\tunits: [\n");
-        // TODO: Print index as well
         fprintf(f, "\t\t[0] = ");
         named_unit_dump(f, ctx, ctx->named_units.items[0]);
         for (size_t i = 1; i < ctx->named_units.count; i++) {
@@ -1041,7 +1039,6 @@ void dump_context(FILE *f, EvalContext *ctx)
     }
     if (ctx->dims.count > 0) {
         fprintf(f, "\tdims: [\n");
-        // TODO: Print index as well
         fprintf(f, "\t\t[0] = ");
         dim_dump(f, ctx, ctx->dims.items[0]);
         for (size_t i = 1; i < ctx->dims.count; i++) {
