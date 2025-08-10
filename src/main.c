@@ -77,6 +77,10 @@ int main(int argc, char **argv)
     for (char *arg = *argv++; arg; arg = *argv++) {
         if (strcmp(arg, "--debug") == 0) {
             args.debug = true;
+        } else { 
+            fprintf(stderr, "ERROR: Unknown argument `%s`.\n", arg);
+            usage(stderr); 
+            exit(1);
         }
     }
 
