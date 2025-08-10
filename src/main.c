@@ -105,6 +105,7 @@ int main(int argc, char **argv)
         }
         eval_stmt(&ctx, stmt);
         if (args.debug) eval_context_dump(stdout, &ctx);
+        stmt_free(stmt);
     }
 
     eval_context_destroy(&ctx);

@@ -525,3 +525,29 @@ void expr_free(Expr expr)
     }
 }
 
+void stmt_free(Stmt stmt)
+{
+    switch (stmt.type) {
+    case STMT_TYPE_NONE:
+        return;
+
+    case STMT_TYPE_DIM_DECL: 
+        expr_free(stmt.as.dim_decl.expr);
+        break;
+
+    case STMT_TYPE_UNIT_DECL: 
+        expr_free(stmt.as.unit_decl.value);
+        break;
+
+    case STMT_TYPE_VAR_DECL:
+        expr_free(stmt.as.var_decl.value);
+        break;
+
+    case STMT_TYPE_EXPR: 
+        expr_free(stmt.as.expr);
+        break;
+
+    case STMT_TYPE__COUNT:
+        assert(0 && "Unreachable");
+    }
+}

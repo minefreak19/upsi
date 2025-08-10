@@ -155,6 +155,7 @@ void op_print(FILE *f, Op op);
 void expr_print(FILE *f, Expr expr);
 void expr_free(Expr expr);
 void stmt_print(FILE *f, Stmt stmt);
+void stmt_free(Stmt stmt);
 
 typedef struct {
     Lexer lexer;
