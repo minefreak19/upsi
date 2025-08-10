@@ -93,9 +93,9 @@ int main(int argc, char **argv)
         .lexer = lexer,
     };
 
-    EvalContext ctx = new_context();
+    EvalContext ctx = eval_context_new();
 
-    if (args.debug) dump_context(stdout, &ctx);
+    if (args.debug) eval_context_dump(stdout, &ctx);
     for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
          stmt      = parse_stmt(&parser)) {
         if (args.debug) {
@@ -104,10 +104,10 @@ int main(int argc, char **argv)
             printf("\n");
         }
         eval_stmt(&ctx, stmt);
-        if (args.debug) dump_context(stdout, &ctx);
+        if (args.debug) eval_context_dump(stdout, &ctx);
     }
 
-    free_context(&ctx);
+    eval_context_destroy(&ctx);
 
     free((void *) text);
     return 0;

@@ -119,8 +119,9 @@ typedef struct {
     } vars;
 } EvalContext;
 
-EvalContext new_context(void);
-void free_context(EvalContext *ctx);
+EvalContext eval_context_new(void);
+void eval_context_destroy(EvalContext *ctx);
+
 Value eval_expr(EvalContext *ctx, Expr expr);
 void eval_stmt(EvalContext *ctx, Stmt stmt);
 
@@ -130,6 +131,6 @@ void compound_unit_dump(FILE *f, EvalContext *ctx, CompoundUnit u);
 void unit_dump(FILE *f, EvalContext *ctx, Unit u);
 void val_dump(FILE *f, EvalContext *ctx, Value v);
 void var_dump(FILE *f, EvalContext *ctx, Var v);
-void dump_context(FILE *f, EvalContext *ctx);
+void eval_context_dump(FILE *f, EvalContext *ctx);
 
 #endif  // EVAL_H_

@@ -114,7 +114,7 @@ static DimIndex resolve_dim_by_name(EvalContext *ctx, StringView name)
         fprintf(stderr, "ERROR: Could not resolve dim `" SV_FMT "`.\n",
                 SV_ARG(name));
         fprintf(stderr, "context: ");
-        dump_context(stderr, ctx);
+        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
@@ -127,7 +127,7 @@ static NamedUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
         fprintf(stderr, "ERROR: Could not resolve unit `" SV_FMT "`.\n",
                 SV_ARG(name));
         fprintf(stderr, "context: ");
-        dump_context(stderr, ctx);
+        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
@@ -140,7 +140,7 @@ static VarIndex resolve_var_by_name(EvalContext *ctx, StringView name)
         fprintf(stderr, "ERROR: Could not resolve var `" SV_FMT "`.\n",
                 SV_ARG(name));
         fprintf(stderr, "context: ");
-        dump_context(stderr, ctx);
+        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
@@ -713,7 +713,7 @@ Value eval_expr(EvalContext *ctx, Expr expr)
             return val_print(ctx, input);
         } else if (sv_eq(expr.as.funcall.fun, SV("dump"))) {
             if (expr.as.funcall.args.count == 0) {
-                dump_context(stdout, ctx);
+                eval_context_dump(stdout, ctx);
                 return (Value) {0};
             }
             if (expr.as.funcall.args.count > 1) {
@@ -821,7 +821,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                     "` already exists.\n",
                     SV_ARG(dim.name));
             fprintf(stderr, "context: ");
-            dump_context(stderr, ctx);
+            eval_context_dump(stderr, ctx);
             exit(1);
         }
 
@@ -845,7 +845,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                     "ERROR: A unit with name `" SV_FMT "` already exists.\n",
                     SV_ARG(unit.name));
             fprintf(stderr, "context: ");
-            dump_context(stderr, ctx);
+            eval_context_dump(stderr, ctx);
             exit(1);
         }
 
@@ -905,7 +905,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                     "` already exists.\n",
                     SV_ARG(var.name));
             fprintf(stderr, "context: ");
-            dump_context(stderr, ctx);
+            eval_context_dump(stderr, ctx);
             exit(1);
         }
 
@@ -933,7 +933,7 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     }
 }
 
-EvalContext new_context(void)
+EvalContext eval_context_new(void)
 {
     EvalContext ctx   = {0};
     Dim dimensionless = {
@@ -951,7 +951,7 @@ EvalContext new_context(void)
     return ctx;
 }
 
-void free_context(EvalContext *ctx)
+void eval_context_destroy(EvalContext *ctx)
 {
     free(ctx->named_units.items);
     free(ctx->dims.items);
@@ -1023,7 +1023,7 @@ void var_dump(FILE *f, EvalContext *ctx, Var v)
 }
 
 // TODO: Improve debugging apparatus
-void dump_context(FILE *f, EvalContext *ctx)
+void eval_context_dump(FILE *f, EvalContext *ctx)
 {
     fprintf(f, "EvalContext {\n");
     if (ctx->named_units.count > 0) {
