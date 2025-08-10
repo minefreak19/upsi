@@ -107,40 +107,46 @@ static bool try_resolve_var_by_name(EvalContext *ctx, StringView name,
     return false;
 }
 
-static DimIndex resolve_dim_by_name(EvalContext *ctx, StringView name)
+/// name_loc is used to print the location of `name` in the error message if the
+/// dim does not exist
+static DimIndex resolve_dim_by_name(EvalContext *ctx, StringView name,
+                                    FileLoc name_loc)
 {
     DimIndex res;
     if (!try_resolve_dim_by_name(ctx, name, &res)) {
-        fprintf(stderr, "ERROR: Could not resolve dim `" SV_FMT "`.\n",
+        loc_print(stderr, name_loc);
+        fprintf(stderr, ": ERROR: Could not resolve dim `" SV_FMT "`.\n",
                 SV_ARG(name));
-        fprintf(stderr, "context: ");
-        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
 }
 
-static NamedUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name)
+/// name_loc is used to print the location of `name` in the error message if the
+/// unit does not exist
+static NamedUnitIndex resolve_unit_by_name(EvalContext *ctx, StringView name,
+                                           FileLoc name_loc)
 {
     NamedUnitIndex res;
     if (!try_resolve_unit_by_name(ctx, name, &res)) {
-        fprintf(stderr, "ERROR: Could not resolve unit `" SV_FMT "`.\n",
+        loc_print(stderr, name_loc);
+        fprintf(stderr, ": ERROR: Could not resolve unit `" SV_FMT "`.\n",
                 SV_ARG(name));
-        fprintf(stderr, "context: ");
-        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
 }
 
-static VarIndex resolve_var_by_name(EvalContext *ctx, StringView name)
+/// name_loc is used to print the location of `name` in the error message if the
+/// variable does not exist
+static VarIndex resolve_var_by_name(EvalContext *ctx, StringView name,
+                                    FileLoc name_loc)
 {
     VarIndex res;
     if (!try_resolve_var_by_name(ctx, name, &res)) {
-        fprintf(stderr, "ERROR: Could not resolve var `" SV_FMT "`.\n",
+        loc_print(stderr, name_loc);
+        fprintf(stderr, ": ERROR: Could not resolve var `" SV_FMT "`.\n",
                 SV_ARG(name));
-        fprintf(stderr, "context: ");
-        eval_context_dump(stderr, ctx);
         exit(1);
     }
     return res;
@@ -174,7 +180,8 @@ static Unit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
 {
     switch (expr.type) {
     case EXPR_TYPE_VAR: {
-        NamedUnitIndex nui = resolve_unit_by_name(ctx, expr.as.var.name);
+        NamedUnitIndex nui =
+            resolve_unit_by_name(ctx, expr.as.var.name, expr.loc);
         return (Unit) {
             .is_anonymous = false,
             .named        = nui,
@@ -211,10 +218,10 @@ static Unit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
                 }
 
                 if (left.compound.elems_count + 1 >= COMPOUND_UNIT_CAP) {
+                    loc_print(stderr, expr.loc);
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d distinct simple "
-                            "units in "
-                            "compound unit.\n",
+                            ": ERROR: Exceeded max cap of %d distinct simple "
+                            "units in compound unit.\n",
                             COMPOUND_UNIT_CAP);
                     exit(1);
                 }
@@ -241,10 +248,10 @@ static Unit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
                 }
 
                 if (left.compound.elems_count + 1 >= COMPOUND_UNIT_CAP) {
+                    loc_print(stderr, expr.loc);
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d distinct simple "
-                            "units in "
-                            "compound unit.\n",
+                            ": ERROR: Exceeded max cap of %d distinct simple "
+                            "units in compound unit.\n",
                             COMPOUND_UNIT_CAP);
                     exit(1);
                 }
@@ -264,7 +271,8 @@ static Unit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
         }
 
         default:
-            fprintf(stderr, "ERROR: Illegal operation `");
+            loc_print(stderr, expr.loc);
+            fprintf(stderr, ": ERROR: Illegal operation `");
             op_print(stderr, expr.as.binop.op);
             fprintf(stderr, "` in unit expression.\n");
             exit(1);
@@ -275,7 +283,10 @@ static Unit resolve_unit_from_expr(EvalContext *ctx, Expr expr)
         return resolve_unit_from_expr(ctx, *expr.as.paren.inner);
 
     default:
-        fprintf(stderr, "ERROR: Can't resolve compound unit from expr: ");
+        // TODO: Include a StringView of the expression as well for better
+        // printing
+        loc_print(stderr, expr.loc);
+        fprintf(stderr, ": ERROR: Can't resolve compound unit from expr: ");
         expr_print(stderr, expr);
         fprintf(stderr, ".\n");
         exit(1);
@@ -295,7 +306,8 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
                     .elems_count = 1,
                     .elems[0] =
                         {
-                            .dim   = resolve_dim_by_name(ctx, expr.as.var.name),
+                            .dim   = resolve_dim_by_name(ctx, expr.as.var.name,
+                                                         expr.loc),
                             .power = 1,
                         },
                 },
@@ -322,10 +334,10 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
                 }
 
                 if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
+                    loc_print(stderr, expr.loc);
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d distinct simple "
-                            "dimensions in "
-                            "compound dimension.\n",
+                            ": ERROR: Exceeded max cap of %d distinct simple "
+                            "dimensions in compound dimension.\n",
                             COMPOUND_DIM_CAP);
                     exit(1);
                 }
@@ -350,10 +362,10 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
                 }
 
                 if (left.as.compound.elems_count + 1 >= COMPOUND_DIM_CAP) {
+                    loc_print(stderr, expr.loc);
                     fprintf(stderr,
-                            "ERROR: Exceeded max cap of %d distinct simple "
-                            "dimensions in "
-                            "compound dimension.\n",
+                            ": ERROR: Exceeded max cap of %d distinct simple "
+                            "dimensions in compound dimension.\n",
                             COMPOUND_DIM_CAP);
                     exit(1);
                 }
@@ -370,7 +382,8 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
         }
 
         default:
-            fprintf(stderr, "ERROR: Illegal operation `");
+            loc_print(stderr, expr.loc);
+            fprintf(stderr, ": ERROR: Illegal operation `");
             op_print(stderr, expr.as.binop.op);
             fprintf(stderr, "` in dimension expression.\n");
             exit(1);
@@ -381,14 +394,16 @@ static Dim resolve_dim_from_expr(EvalContext *ctx, Expr expr)
         return resolve_dim_from_expr(ctx, *expr.as.paren.inner);
 
     default:
-        fprintf(stderr, "ERROR: Can't resolve compound unit from expr: ");
+        loc_print(stderr, expr.loc);
+        fprintf(stderr, ": ERROR: Can't resolve compound unit from expr: ");
         expr_print(stderr, expr);
         fprintf(stderr, ".\n");
         exit(1);
     }
 }
 
-static Value value_binop(EvalContext *ctx, Value left, Value right, Op op)
+static Value value_binop(EvalContext *ctx, Value left, Value right, Op op,
+                         FileLoc loc)
 {
     switch (op) {
     case OP_MULT: {
@@ -414,9 +429,12 @@ static Value value_binop(EvalContext *ctx, Value left, Value right, Op op)
             }
 
             if (left.unit.compound.elems_count + 1 >= COMPOUND_UNIT_CAP) {
+                // TODO: Handle passing in of empty loc (don't print loc and
+                // adjust fprintf() call)
+                loc_print(stderr, loc);
                 fprintf(
                     stderr,
-                    "ERROR: Exceeded max cap of %d distinct simple units in "
+                    ": ERROR: Exceeded max cap of %d distinct simple units in "
                     "compound unit.\n",
                     COMPOUND_UNIT_CAP);
                 exit(1);
@@ -460,11 +478,12 @@ static Value value_binop(EvalContext *ctx, Value left, Value right, Op op)
                 -right.unit.compound.elems[i].power;
         }
 
-        return value_binop(ctx, left, right, OP_MULT);
+        return value_binop(ctx, left, right, OP_MULT, loc);
     }
 
     default:
-        fprintf(stderr, "ERROR: Don't know how to perform operation: ");
+        loc_print(stderr, loc);
+        fprintf(stderr, ": ERROR: Don't know how to perform operation: ");
         op_print(stderr, op);
         fputc('\n', stderr);
         exit(1);
@@ -566,7 +585,8 @@ static bool unit_is_castable(EvalContext *ctx, Unit a, Unit b)
 }
 
 static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
-                                                      NamedUnit unit)
+                                                      NamedUnit unit,
+                                                      FileLoc loc)
 {
     assert(named_unit_is_simple(ctx, unit));
     if (named_unit_is_fundamental(unit)) return 1;
@@ -576,7 +596,7 @@ static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
 
     if (unit.val.unit.is_anonymous) {
         fprintf(stderr,
-                "ERROR: Assertion failed: Expected compound unit, got: ");
+                "UNREACHABLE: Assertion failed: Expected compound unit, got: ");
         named_unit_dump(stderr, ctx, unit);
         fprintf(stderr, "\n");
         exit(1);
@@ -586,8 +606,9 @@ static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
 
     for (int i = 0; !named_unit_is_fundamental(current_unit); i++) {
         if (i >= UNIT_CAST_MAX_DEPTH) {
+            loc_print(stderr, loc);
             fprintf(stderr,
-                    "ERROR: Exceeded max depth of %d while trying "
+                    ": ERROR: Exceeded max depth of %d while trying "
                     "to cast to/from unit `" SV_FMT "`.\n",
                     UNIT_CAST_MAX_DEPTH, SV_ARG(unit.name));
             exit(1);
@@ -604,32 +625,35 @@ static double conversion_factor_to_fundamental_simple(EvalContext *ctx,
 }
 
 static double conversion_factor_to_fundamental_compound(EvalContext *ctx,
-                                                        CompoundUnit unit)
+                                                        CompoundUnit unit,
+                                                        FileLoc loc)
 {
     double conv_factor = 1;
     for (size_t i = 0; i < unit.elems_count; i++) {
         double simple_factor = conversion_factor_to_fundamental_simple(
-            ctx, ctx->named_units.items[unit.elems[i].unit]);
+            ctx, ctx->named_units.items[unit.elems[i].unit], loc);
         conv_factor *= pow(simple_factor, unit.elems[i].power);
     }
 
     return conv_factor;
 }
 
-static double conversion_factor_to_fundamental(EvalContext *ctx, Unit unit)
+static double conversion_factor_to_fundamental(EvalContext *ctx, Unit unit,
+                                               FileLoc loc)
 {
     if (unit.is_anonymous) {
-        return conversion_factor_to_fundamental_compound(ctx, unit.compound);
+        return conversion_factor_to_fundamental_compound(ctx, unit.compound,
+                                                         loc);
     }
 
     if (named_unit_is_simple(ctx, ctx->named_units.items[unit.named])) {
         return conversion_factor_to_fundamental_simple(
-            ctx, ctx->named_units.items[unit.named]);
+            ctx, ctx->named_units.items[unit.named], loc);
     }
 
     return ctx->named_units.items[unit.named].val.num *
            conversion_factor_to_fundamental_compound(
-               ctx, coerce_named_unit_index_to_compound(ctx, unit.named));
+               ctx, coerce_named_unit_index_to_compound(ctx, unit.named), loc);
 }
 
 Value eval_expr(EvalContext *ctx, Expr expr)
@@ -637,10 +661,11 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     switch (expr.type) {
     case EXPR_TYPE_NUM: {
         double num = expr.as.num.val;
-        // TODO: Support compound unit literals
-        NamedUnitIndex nui = (sv_is_empty(expr.as.num.unit))
-                                 ? UNITLESS
-                                 : resolve_unit_by_name(ctx, expr.as.num.unit);
+        // TODO: Support anonymous compound units in number literals
+        NamedUnitIndex nui =
+            (sv_is_empty(expr.as.num.unit))
+                ? UNITLESS
+                : resolve_unit_by_name(ctx, expr.as.num.unit, expr.loc);
 
         return (Value) {
             .num = num,
@@ -656,15 +681,16 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         Value left  = eval_expr(ctx, *expr.as.binop.left);
         Value right = eval_expr(ctx, *expr.as.binop.right);
 
-        return value_binop(ctx, left, right, expr.as.binop.op);
+        return value_binop(ctx, left, right, expr.as.binop.op, expr.loc);
     }
 
     case EXPR_TYPE_VAR: {
-        VarIndex idx = resolve_var_by_name(ctx, expr.as.var.name);
+        VarIndex idx = resolve_var_by_name(ctx, expr.as.var.name, expr.loc);
         Var var      = ctx->vars.items[idx];
         if (!var.initialised) {
+            loc_print(stderr, expr.loc);
             fprintf(stderr,
-                    "ERROR: Attempt to read uninitialised variable `" SV_FMT
+                    ": ERROR: Attempt to read uninitialised variable `" SV_FMT
                     "`.\n",
                     SV_ARG(var.name));
             exit(1);
@@ -673,15 +699,20 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     }
 
     case EXPR_TYPE_ASSIGN: {
-        VarIndex idx = resolve_var_by_name(ctx, expr.as.assign.lhs);
+        // TODO: This might be a pedantic distinction, but at present this error
+        // would be printed with the location of the '=' rather than the
+        // location of the variable name. It would be better if the variable
+        // name's location could be found and sent
+        VarIndex idx = resolve_var_by_name(ctx, expr.as.assign.lhs, expr.loc);
         Value rhs    = eval_expr(ctx, *expr.as.assign.rhs);
 
         // TODO: Better error message on dimensionality mismatch (specify the
         // names of both dimensions)
         if (ctx->vars.items[idx].initialised &&
             !unit_is_castable(ctx, ctx->vars.items[idx].value.unit, rhs.unit)) {
+            loc_print(stderr, expr.loc);
             fprintf(stderr,
-                    "ERROR: Cannot assign to var `" SV_FMT
+                    ": ERROR: Cannot assign to var `" SV_FMT
                     "`: Dimensionality mismatch.\n",
                     SV_ARG(expr.as.assign.lhs));
             exit(1);
@@ -695,16 +726,17 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     case EXPR_TYPE_FUNCALL: {
         if (sv_eq(expr.as.funcall.fun, SV("print"))) {
             if (expr.as.funcall.args.count == 0) {
+                loc_print(stderr, expr.loc);
                 fprintf(stderr,
-                        "ERROR: `print`: No argument provided "
+                        ": ERROR: `print`: No argument provided "
                         "(expected 1).\n");
                 exit(1);
             }
             if (expr.as.funcall.args.count > 1) {
+                loc_print(stderr, expr.loc);
                 fprintf(stderr,
-                        "ERROR: `print`: Too many arguments provided "
-                        "(got %zu, "
-                        "expected 1).\n",
+                        ": ERROR: `print`: Too many arguments provided "
+                        "(got %zu, expected 1).\n",
                         expr.as.funcall.args.count);
                 exit(1);
             }
@@ -717,28 +749,28 @@ Value eval_expr(EvalContext *ctx, Expr expr)
                 return (Value) {0};
             }
             if (expr.as.funcall.args.count > 1) {
+                loc_print(stderr, expr.loc);
                 fprintf(stderr,
-                        "ERROR: `dump`: Too many arguments provided "
-                        "(got %zu, "
-                        "expected 1).\n",
+                        ": ERROR: `dump`: Too many arguments provided "
+                        "(got %zu, expected 1).\n",
                         expr.as.funcall.args.count);
                 exit(1);
             }
 
             Expr inner = expr.as.funcall.args.items[0];
             if (inner.type == EXPR_TYPE_VAR) {
-                var_dump(
-                    stdout, ctx,
-                    ctx->vars
-                        .items[resolve_var_by_name(ctx, inner.as.var.name)]);
+                var_dump(stdout, ctx,
+                         ctx->vars.items[resolve_var_by_name(
+                             ctx, inner.as.var.name, inner.loc)]);
             }
 
             Value input = eval_expr(ctx, inner);
             printf("value: ");
             return val_print(ctx, input);
         } else {
+            loc_print(stderr, expr.loc);
             fprintf(stderr,
-                    "ERROR: TODO: Function calls are not implemented "
+                    ": TODO: Function calls are not implemented "
                     "yet.\n");
             fprintf(stderr,
                     "NOTE: Only the following standard functions are "
@@ -760,10 +792,13 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         Unit target = resolve_unit_from_expr(ctx, *expr.as.unit_cast.target);
 
         if (!unit_is_castable(ctx, source, target)) {
-            fprintf(stderr, "ERROR: Cannot cast a value of unit `");
+            loc_print(stderr, expr.loc);
+            fprintf(stderr, ": ERROR: Cannot cast a value of unit `");
             unit_dump(stderr, ctx, source);
             fprintf(stderr, "` to unit `");
             unit_dump(stderr, ctx, target);
+            // TODO: Make the dimensionality mismatch error messages more
+            // specific
             fprintf(stderr, "`: Dimensionality mismatch.\n");
             exit(1);
         }
@@ -772,10 +807,12 @@ Value eval_expr(EvalContext *ctx, Expr expr)
         // (e.g. Fahrenheit/Celsius)
         double conv_factor = 1;
         if (!unit_is_fundamental(ctx, target)) {
-            conv_factor /= conversion_factor_to_fundamental(ctx, target);
+            conv_factor /=
+                conversion_factor_to_fundamental(ctx, target, expr.loc);
         }
         if (!unit_is_fundamental(ctx, source)) {
-            conv_factor *= conversion_factor_to_fundamental(ctx, source);
+            conv_factor *=
+                conversion_factor_to_fundamental(ctx, source, expr.loc);
         }
 
         return (Value) {
@@ -789,7 +826,8 @@ Value eval_expr(EvalContext *ctx, Expr expr)
     }
 
     default:
-        fprintf(stderr, "ERROR: Don't know how to evaluate expression: ");
+        loc_print(stderr, expr.loc);
+        fprintf(stderr, ": ERROR: Don't know how to evaluate expression: ");
         expr_print(stderr, expr);
         fputc('\n', stderr);
         exit(1);
@@ -815,13 +853,12 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
         dim.name = stmt.as.dim_decl.name;
 
         if (try_resolve_dim_by_name(ctx, dim.name, NULL)) {
-            // TODO: Better (located) error reporting
+            loc_print(stderr, stmt.loc);
             fprintf(stderr,
-                    "ERROR: A dimension with name `" SV_FMT
+                    ": ERROR: A dimension with name `" SV_FMT
                     "` already exists.\n",
                     SV_ARG(dim.name));
-            fprintf(stderr, "context: ");
-            eval_context_dump(stderr, ctx);
+            // TODO: Point the user to where the dimension was already defined
             exit(1);
         }
 
@@ -830,7 +867,10 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     }
 
     case STMT_TYPE_UNIT_DECL: {
-        DimIndex dim = resolve_dim_by_name(ctx, stmt.as.unit_decl.dim);
+        // TODO: This refers to the 'unit' keyword when it should refer to the
+        // location of the dimension's identifier token
+        DimIndex dim =
+            resolve_dim_by_name(ctx, stmt.as.unit_decl.dim, stmt.loc);
 
         NamedUnit unit = {
             .name = stmt.as.unit_decl.name,
@@ -840,12 +880,11 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                         : (Value) {0},
         };
         if (try_resolve_unit_by_name(ctx, unit.name, NULL)) {
-            // TODO: Better (located) error reporting
+            loc_print(stderr, stmt.loc);
             fprintf(stderr,
-                    "ERROR: A unit with name `" SV_FMT "` already exists.\n",
+                    ": ERROR: A unit with name `" SV_FMT "` already exists.\n",
                     SV_ARG(unit.name));
-            fprintf(stderr, "context: ");
-            eval_context_dump(stderr, ctx);
+            // TODO: Point the user to where the unit was already defined
             exit(1);
         }
 
@@ -860,9 +899,10 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
                 // implicitly defined through the definition of this fundamental
                 // unit
                 // TODO: Compute fundamental unit for compound dimensions
+                loc_print(stderr, stmt.loc);
                 fprintf(
                     stderr,
-                    "ERROR: Dimension `" SV_FMT
+                    ": ERROR: Dimension `" SV_FMT
                     "` is a compound (derived) dimension and thus already has "
                     "an implicit fundamental unit. The unit `" SV_FMT
                     "` should be expressed in terms of simpler units.\n",
@@ -871,10 +911,14 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             }
 
             // TODO: Add assertions/errors that prevent a dimension without an
-            // instantiated fundamental unit from being used in variables
+            // instantiated fundamental unit from being used in variables, or
+            // enforce the same through syntax
             if (dim->as.simple.fundamental_unit != UNITLESS) {
+                // TODO: Point the user to where the fundamental unit was
+                // already defined
+                loc_print(stderr, stmt.loc);
                 fprintf(stderr,
-                        "ERROR: Simple dimension `" SV_FMT
+                        ": ERROR: Simple dimension `" SV_FMT
                         "` already has a fundamental unit `" SV_FMT
                         "`. The unit `" SV_FMT
                         "` must be expressed in terms of the fundamental "
@@ -900,12 +944,12 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
             .name = stmt.as.var_decl.name,
         };
         if (try_resolve_var_by_name(ctx, var.name, NULL)) {
+            loc_print(stderr, stmt.loc);
             fprintf(stderr,
-                    "ERROR: A variable with name `" SV_FMT
+                    ": ERROR: A variable with name `" SV_FMT
                     "` already exists.\n",
                     SV_ARG(var.name));
-            fprintf(stderr, "context: ");
-            eval_context_dump(stderr, ctx);
+            // TODO: Point the user to where the variable was already defined
             exit(1);
         }
 
@@ -926,7 +970,8 @@ void eval_stmt(EvalContext *ctx, Stmt stmt)
     }
 
     default:
-        fprintf(stderr, "ERROR: Don't know how to evaluate statement: ");
+        loc_print(stderr, stmt.loc);
+        fprintf(stderr, ": ERROR: Don't know how to evaluate statement: ");
         stmt_print(stderr, stmt);
         fputc('\n', stderr);
         exit(1);

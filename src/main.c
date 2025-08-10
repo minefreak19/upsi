@@ -127,7 +127,8 @@ int main(int argc, char **argv)
     for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
          stmt_free(stmt), stmt = parse_stmt(&parser)) {
         if (args.mode == MODE_DEBUG || args.mode == MODE_DEBUG_PARSER) {
-            printf("Parsed stmt: ");
+            loc_print(stdout, stmt.loc);
+            printf(": Parsed stmt: ");
             stmt_print(stdout, stmt);
             printf("\n");
         }

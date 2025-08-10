@@ -60,11 +60,15 @@ static Expr parse_primary_expr(Parser *self)
         ensure_tok_type(closing, TOK_TYPE_RPAREN, "closing parenthesis");
 
         return (Expr) {
+            // Paren expressions take the location of their left parenthesis
+            .loc            = tok.loc,
             .type           = EXPR_TYPE_PAREN,
             .as.paren.inner = parser_save_expr(self, inner),
         };
     } else if (tok.type == TOK_TYPE_NUM) {
         Expr res = {
+            // Num expressions take the location of their number token
+            .loc         = tok.loc,
             .type        = EXPR_TYPE_NUM,
             .as.num.val  = tok.numval,
             .as.num.unit = SV(""),
@@ -79,6 +83,8 @@ static Expr parse_primary_expr(Parser *self)
         return res;
     } else if (tok.type == TOK_TYPE_NAME) {
         return (Expr) {
+            // Var tokens take the location of their identifier token
+            .loc         = tok.loc,
             .type        = EXPR_TYPE_VAR,
             .as.var.name = tok.name,
         };
@@ -106,6 +112,8 @@ static Expr parse_funcall_expr(Parser *self)
     if (next.type == TOK_TYPE_RPAREN) {
         lex_token(&self->lexer);
         return (Expr) {
+            // Funcall expressions take the location of the function name
+            .loc  = primExpr.loc,
             .type = EXPR_TYPE_FUNCALL,
             .as.funcall =
                 {
@@ -137,6 +145,7 @@ static Expr parse_funcall_expr(Parser *self)
     }
 
     return (Expr) {
+        .loc  = primExpr.loc,
         .type = EXPR_TYPE_FUNCALL,
         .as.funcall =
             {
@@ -160,6 +169,8 @@ static Expr parse_geom_expr(Parser *self)
     Expr right = parse_geom_expr(self);
 
     return (Expr) {
+        // Binary ops take the location of the operand
+        .loc  = next.loc,
         .type = EXPR_TYPE_BINOP,
         .as.binop =
             {
@@ -183,6 +194,8 @@ static Expr parse_unit_cast_expr(Parser *self)
     Expr unit = parse_expr(self);
 
     return (Expr) {
+        // Unit cast exprs take the location of the `in` keyword
+        .loc  = next.loc,
         .type = EXPR_TYPE_UNITCAST,
         .as.unit_cast =
             {
@@ -205,6 +218,8 @@ static Expr parse_assignment_expr(Parser *self)
         lex_token(&self->lexer);
         Expr rhs = parse_expr(self);
         return (Expr) {
+            // Assignment exprs take the location of the '=' sign
+            .loc  = next.loc,
             .type = EXPR_TYPE_ASSIGN,
             .as.assign =
                 {
@@ -223,10 +238,13 @@ Expr parse_expr(Parser *self) { return parse_assignment_expr(self); }
 /// consumed.
 static Stmt parse_dim_decl(Parser *self)
 {
-    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_DIM);
-
     Stmt res = {0};
     res.type = STMT_TYPE_DIM_DECL;
+
+    Token kw = lex_token(&self->lexer);
+    // Otherwise this function shouldn't have been called
+    assert(kw.type == TOK_TYPE_KEYWORD_DIM);
+    res.loc = kw.loc;
 
     Token name = lex_token(&self->lexer);
     ensure_tok_type(name, TOK_TYPE_NAME, "name of dimension");
@@ -248,10 +266,13 @@ static Stmt parse_dim_decl(Parser *self)
 
 static Stmt parse_unit_decl(Parser *self)
 {
-    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_UNIT);
-
     Stmt res = {0};
     res.type = STMT_TYPE_UNIT_DECL;
+
+    Token kw = lex_token(&self->lexer);
+    // Otherwise this function shouldn't have been called
+    assert(kw.type == TOK_TYPE_KEYWORD_UNIT);
+    res.loc = kw.loc;
 
     Token unit_name = lex_token(&self->lexer);
     ensure_tok_type(unit_name, TOK_TYPE_NAME, "name of unit");
@@ -279,7 +300,8 @@ static Stmt parse_unit_decl(Parser *self)
 
 static Stmt parse_var_decl(Parser *self)
 {
-    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_LET);
+    Token kw = lex_token(&self->lexer);
+    assert(kw.type == TOK_TYPE_KEYWORD_LET);
 
     Token name = lex_token(&self->lexer);
     ensure_tok_type(name, TOK_TYPE_NAME, "variable name");
@@ -295,6 +317,7 @@ static Stmt parse_var_decl(Parser *self)
                     "a semicolon after variable declaration");
 
     return (Stmt) {
+        .loc  = kw.loc,
         .type = STMT_TYPE_VAR_DECL,
         .as.var_decl =
             {
@@ -312,6 +335,7 @@ Stmt parse_stmt(Parser *self)
     case TOK_TYPE_NONE:
         lex_token(&self->lexer);
         return (Stmt) {
+            .loc  = tok.loc,
             .type = STMT_TYPE_NONE,
         };
 
@@ -337,6 +361,7 @@ Stmt parse_stmt(Parser *self)
                         "semicolon after expression statement");
 
         return (Stmt) {
+            .loc     = tok.loc,
             .type    = STMT_TYPE_EXPR,
             .as.expr = expr,
         };
@@ -532,11 +557,11 @@ void stmt_free(Stmt stmt)
     case STMT_TYPE_NONE:
         return;
 
-    case STMT_TYPE_DIM_DECL: 
+    case STMT_TYPE_DIM_DECL:
         expr_free(stmt.as.dim_decl.expr);
         break;
 
-    case STMT_TYPE_UNIT_DECL: 
+    case STMT_TYPE_UNIT_DECL:
         expr_free(stmt.as.unit_decl.value);
         break;
 
@@ -544,7 +569,7 @@ void stmt_free(Stmt stmt)
         expr_free(stmt.as.var_decl.value);
         break;
 
-    case STMT_TYPE_EXPR: 
+    case STMT_TYPE_EXPR:
         expr_free(stmt.as.expr);
         break;
 

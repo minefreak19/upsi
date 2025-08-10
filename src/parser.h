@@ -68,6 +68,7 @@ typedef struct Exprs {
 } Exprs;
 
 typedef struct Expr {
+    FileLoc loc;
     ExprType type;
     union {
         struct {
@@ -125,6 +126,8 @@ typedef enum {
 } StmtType;
 
 typedef struct {
+    // TODO: Does this need more granularity?
+    FileLoc loc;
     StmtType type;
     union {
         struct {
