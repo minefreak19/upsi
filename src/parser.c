@@ -223,6 +223,8 @@ Expr parse_expr(Parser *self) { return parse_assignment_expr(self); }
 /// consumed.
 static Stmt parse_dim_decl(Parser *self)
 {
+    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_DIM);
+
     Stmt res = {0};
     res.type = STMT_TYPE_DIM_DECL;
 
@@ -246,6 +248,8 @@ static Stmt parse_dim_decl(Parser *self)
 
 static Stmt parse_unit_decl(Parser *self)
 {
+    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_UNIT);
+
     Stmt res = {0};
     res.type = STMT_TYPE_UNIT_DECL;
 
@@ -275,6 +279,8 @@ static Stmt parse_unit_decl(Parser *self)
 
 static Stmt parse_var_decl(Parser *self)
 {
+    assert(lex_token(&self->lexer).type == TOK_TYPE_KEYWORD_LET);
+
     Token name = lex_token(&self->lexer);
     ensure_tok_type(name, TOK_TYPE_NAME, "variable name");
 
@@ -310,17 +316,12 @@ Stmt parse_stmt(Parser *self)
         };
 
     case TOK_TYPE_KEYWORD_DIM:
-        // TODO: Refactor this so that the consumption of the keyword token
-        // happens in the corresponding function
-        lex_token(&self->lexer);
         return parse_dim_decl(self);
 
     case TOK_TYPE_KEYWORD_UNIT:
-        lex_token(&self->lexer);
         return parse_unit_decl(self);
 
     case TOK_TYPE_KEYWORD_LET:
-        lex_token(&self->lexer);
         return parse_var_decl(self);
 
     case TOK_TYPE_SEMICOLON:
