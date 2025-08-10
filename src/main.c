@@ -13,8 +13,12 @@
 static struct {
     const char *program_name;
     const char *source_file;
-    bool debug;
-} args;
+    enum {
+        MODE_NORMAL = 0,
+        MODE_DEBUG,
+        MODE_DEBUG_PARSER,
+    } mode;
+} args = {0};
 
 /// Expects caller to `free()` the returned cstr
 char *slurp_file_to_cstr(const char *path)
@@ -54,7 +58,17 @@ char *slurp_file_to_cstr(const char *path)
 
 void usage(FILE *f)
 {
-    fprintf(f, "Usage: %s <source_file>\n", args.program_name);
+    fprintf(f, "Usage: %s <source_file> [mode]\n", args.program_name);
+    fprintf(f, "Modes: \n");
+    fprintf(f,
+            "\t--debug - Standard debugging mode. Interprets code while "
+            "printing debug info every statement.\n");
+    fprintf(f,
+            "\t--debug-parser - Parser debugging mode. Only parses statements "
+            "(printing debug info every statement), without interpreting.\n");
+    fprintf(f,
+            "If no mode is specified ('normal mode'), interprets code without "
+            "printing debug information.\n");
 }
 
 int main(int argc, char **argv)
@@ -76,10 +90,22 @@ int main(int argc, char **argv)
 
     for (char *arg = *argv++; arg; arg = *argv++) {
         if (strcmp(arg, "--debug") == 0) {
-            args.debug = true;
-        } else { 
+            if (args.mode != MODE_NORMAL) {
+                fprintf(stderr,
+                        "WARN: Overwriting previously specified mode to enter "
+                        "into debug mode.\n");
+            }
+            args.mode = MODE_DEBUG;
+        } else if (strcmp(arg, "--debug-parser") == 0) {
+            if (args.mode != MODE_NORMAL) {
+                fprintf(stderr,
+                        "WARN: Overwriting previously specified mode to enter "
+                        "into parser debug mode.\n");
+            }
+            args.mode = MODE_DEBUG_PARSER;
+        } else {
             fprintf(stderr, "ERROR: Unknown argument `%s`.\n", arg);
-            usage(stderr); 
+            usage(stderr);
             exit(1);
         }
     }
@@ -95,17 +121,19 @@ int main(int argc, char **argv)
 
     EvalContext ctx = eval_context_new();
 
-    if (args.debug) eval_context_dump(stdout, &ctx);
+    // TODO: Rewrite the basic control flow into a large switch-case to reduce
+    // complexity
+    if (args.mode == MODE_DEBUG) eval_context_dump(stdout, &ctx);
     for (Stmt stmt = parse_stmt(&parser); stmt.type != STMT_TYPE_NONE;
-         stmt      = parse_stmt(&parser)) {
-        if (args.debug) {
+         stmt_free(stmt), stmt = parse_stmt(&parser)) {
+        if (args.mode == MODE_DEBUG || args.mode == MODE_DEBUG_PARSER) {
             printf("Parsed stmt: ");
             stmt_print(stdout, stmt);
             printf("\n");
         }
-        eval_stmt(&ctx, stmt);
-        if (args.debug) eval_context_dump(stdout, &ctx);
-        stmt_free(stmt);
+        if (args.mode == MODE_NORMAL || args.mode == MODE_DEBUG)
+            eval_stmt(&ctx, stmt);
+        if (args.mode == MODE_DEBUG) eval_context_dump(stdout, &ctx);
     }
 
     eval_context_destroy(&ctx);
